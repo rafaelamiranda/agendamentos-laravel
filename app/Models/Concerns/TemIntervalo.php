@@ -25,6 +25,15 @@ trait TemIntervalo
     }
 
     /**
+     * Versão em memória do scope sobrepondo(), com a mesma regra. Usada quando
+     * os registros já foram carregados e não vale a pena ir ao banco de novo.
+     */
+    public function sobrepoe(CarbonInterface $inicio, CarbonInterface $fim): bool
+    {
+        return $this->inicio < $fim && $this->fim > $inicio;
+    }
+
+    /**
      * Registros que cruzam o intervalo [$inicio, $fim).
      *
      * Dois intervalos semiabertos A e B se sobrepõem quando
