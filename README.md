@@ -40,6 +40,25 @@ Usuário administrador do seeder: `admin@agendamentos.test`, senha `password`.
 
 **SELinux (Fedora/RHEL):** se os containers não conseguirem ler ou gravar nos volumes, adicione `:z` aos volumes de bind no `compose.yaml` (por exemplo `'.:/var/www/html:z'`).
 
+### Fila, agendador e Mercado Pago
+
+Os avisos de pagamento são processados na fila (Redis), e as reservas vencidas são expiradas pelo agendador. Em desenvolvimento, rode cada um num terminal:
+
+```bash
+./vendor/bin/sail artisan queue:work
+./vendor/bin/sail artisan schedule:work
+```
+
+Para gerar Pix de verdade no sandbox, crie uma aplicação no [painel de desenvolvedores do Mercado Pago](https://www.mercadopago.com.br/developers/panel/app) e preencha no `.env`:
+
+| Variável | Onde encontrar |
+|---|---|
+| `MERCADOPAGO_ACCESS_TOKEN` | Credenciais de teste (começa com `TEST-`) |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Webhooks > Configurar notificações > assinatura secreta |
+| `MERCADOPAGO_NOTIFICATION_URL` | URL pública que aponta para `/api/webhooks/mercadopago` (em desenvolvimento, um túnel como o ngrok) |
+
+Os testes não dependem disso: todas as chamadas ao Mercado Pago são simuladas com `Http::fake`, e qualquer chamada não simulada faz o teste falhar.
+
 ## Qualidade e testes
 
 ```bash
@@ -53,7 +72,8 @@ Usuário administrador do seeder: `admin@agendamentos.test`, senha `password`.
 | Método | Rota | O que faz |
 |---|---|---|
 | `GET` | `/api/profissionais/{id}/disponibilidade?servico_id=&data=AAAA-MM-DD` | Horários livres do profissional para o serviço no dia |
-| `POST` | `/api/agendamentos` | Reserva um horário; cria o agendamento `pendente` (5 por minuto por IP) |
+| `POST` | `/api/agendamentos` | Reserva um horário: cria o agendamento `pendente` e devolve o Pix do sinal (5 por minuto por IP) |
+| `POST` | `/api/webhooks/mercadopago` | Recebe os avisos de pagamento (assinatura HMAC obrigatória) |
 
 Exemplo de reserva:
 
@@ -69,10 +89,13 @@ POST /api/agendamentos
 
 | Resposta | Quando |
 |---|---|
-| `201` | Reserva criada, com `expira_em` = agora + prazo do sinal |
+| `201` | Reserva criada, com `expira_em` = agora + prazo do sinal e `pagamento.pix` (copia e cola e QR Code em base64) |
 | `409` | Horário indisponível: ocupado, fora da grade ou da jornada, fora da antecedência mínima ou máxima |
 | `422` | Dados inválidos, ou o profissional não realiza o serviço |
 | `429` | Limite de reservas por IP atingido |
+| `503` | O Pix não pôde ser gerado; a reserva é desfeita e o horário volta a ficar livre |
+
+Depois do pagamento, o webhook confirma o agendamento (`pendente` → `confirmado`). Sem pagamento, a reserva vence em 15 minutos e o horário volta para a disponibilidade.
 
 ## Modelo de domínio
 
@@ -133,6 +156,26 @@ Status do agendamento (`App\Enums\StatusAgendamento`): `pendente` (aguardando si
 **Antecedência mínima e máxima.** Um horário só pode ser reservado a partir de agora + 120 min e até hoje + 60 dias (configuráveis). O limite máximo evita reservas para meses à frente, quando preços e jornadas ainda podem mudar.
 
 **Mensagens em português sem pacote.** `lang/pt_BR` foi traduzido à mão (validação, autenticação, senhas, paginação), e os nomes dos campos foram mapeados ("O campo serviço é obrigatório"). O idioma de fallback é `en`, para que uma chave sem tradução apareça em inglês, nunca como texto cru.
+
+**Gateway de pagamento atrás de uma interface.** O domínio depende de `GatewayPix`, e `MercadoPagoGateway` é a única classe que conhece a API do Mercado Pago. Trocar de provedor é escrever outra implementação e mudar um binding no `AppServiceProvider`. Os testes usam `Http::fake` na implementação real, o que também testa o formato das chamadas. `Http::preventStrayRequests()` garante que nenhum teste fale com a internet.
+
+**Pix gerado depois do commit da reserva.** A chamada ao Mercado Pago pode levar segundos. Feita dentro da transação, ela seguraria o lock do profissional e travaria todas as reservas dele nesse tempo. Por isso a reserva faz commit primeiro e o Pix é gerado depois. Se o gateway falhar, a reserva é desfeita na hora (compensação: status `expirado`) e a API responde 503, em vez de deixar um horário preso sem forma de pagar.
+
+**Chave de idempotência na criação do Pix.** Toda tentativa de criar o pagamento envia `X-Idempotency-Key: agendamento-{id}`. Se a primeira chamada criou o Pix mas a resposta se perdeu (timeout), o retry recebe o mesmo pagamento em vez de gerar um segundo Pix para o cliente. O retry só acontece em falha de rede ou erro 5xx. Um 4xx daria o mesmo erro de novo.
+
+**Centavos convertidos só na borda.** A API do Mercado Pago trabalha com reais decimais (`30.5`). A conversão acontece apenas no `MercadoPagoGateway`, nos dois sentidos (`round(valor * 100)` na volta). O resto do sistema só vê inteiros.
+
+**Webhook: assinatura, resposta rápida e fila.** O middleware confere o HMAC-SHA256 do header `x-signature` com `hash_equals` (comparação em tempo constante) e recusa avisos com horário fora da tolerância de 5 minutos, para impedir que um aviso capturado seja reenviado depois (replay). Sem o segredo configurado, ele recusa tudo (fail closed). O controller só enfileira um job e responde 200: o Mercado Pago espera resposta em poucos segundos e reenvia se não recebe. Se a API dele falhar durante o processamento, o job é tentado de novo com intervalo crescente.
+
+**O corpo do webhook não decide nada.** O aviso é tratado só como sinal de que algo mudou. O job consulta o pagamento na API do Mercado Pago, que é a fonte da verdade, e só então aplica o status. Um aviso forjado, mesmo que passasse pela assinatura, não confirmaria nada.
+
+**Webhook idempotente e tolerante a avisos fora de ordem.** O mesmo pagamento pode ser avisado várias vezes, em qualquer ordem. O processamento trava a linha do pagamento (`lockForUpdate`), então dois workers com o mesmo aviso passam um de cada vez, e só aplica transições permitidas (`StatusPagamento::podeMudarPara`). Um "aprovado" repetido não faz nada, e um "pendente" atrasado não desfaz um "aprovado". O `gateway_id` é único no banco.
+
+**Quem pagou nunca fica sem horário e sem dinheiro.** Pagamento aprovado confirma o agendamento se ele ainda estiver pendente ou expirado e o horário continuar livre. Isso cobre o caso de o aviso chegar depois do job de expiração. O horário é conferido sob o mesmo lock do profissional usado na reserva. Se o agendamento foi cancelado, se o horário já foi reservado por outra pessoa ou se o valor pago difere do sinal, o pagamento fica com `requer_estorno = true` e um log de erro, para o estabelecimento devolver o dinheiro.
+
+**O Pix vence junto com a reserva.** A cobrança é criada com `date_of_expiration` igual ao `expira_em` da reserva. Depois disso, o Mercado Pago não aceita mais o pagamento de um horário que já voltou para a agenda.
+
+**Job de expiração só arruma o status.** `ExpirarReservasVencidas` roda a cada minuto (`withoutOverlapping`) e marca os pendentes vencidos como `expirado` num único `UPDATE`. O horário já ficou livre antes, no instante em que `expira_em` passou, por causa do scope `ocupandoHorario`. Então um atraso do job não prende horário de ninguém.
 
 **`restrictOnDelete` nos agendamentos.** Agendamento é histórico financeiro. Apagar profissional, serviço ou cliente que tenha agendamentos falha no banco; o caminho certo é desativar o cadastro (`ativo`). Jornadas, bloqueios e o vínculo com serviços são dados do próprio profissional e usam `cascadeOnDelete`.
 
