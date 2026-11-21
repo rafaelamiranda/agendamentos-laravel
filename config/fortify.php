@@ -161,7 +161,8 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Sem cadastro público: o painel é só para administradores, criados
+        // pelo seeder ou por outro administrador.
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([
