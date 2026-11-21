@@ -81,6 +81,14 @@ class MercadoPagoGateway implements GatewayPix
         );
     }
 
+    public function estornar(string $gatewayId, string $chaveIdempotencia): void
+    {
+        // Corpo vazio = estorno total. Estorno parcial mandaria "amount".
+        $this->enviar(fn () => $this->http()
+            ->withHeader('X-Idempotency-Key', $chaveIdempotencia)
+            ->post('/v1/payments/'.rawurlencode($gatewayId).'/refunds', (object) []));
+    }
+
     /**
      * Status do Mercado Pago para o status do domínio. Status desconhecidos
      * ficam como pendentes: melhor esperar o próximo aviso do que confirmar

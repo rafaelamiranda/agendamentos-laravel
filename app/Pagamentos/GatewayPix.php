@@ -25,4 +25,12 @@ interface GatewayPix
      * @throws FalhaGatewayPagamentoException
      */
     public function consultarPagamento(string $gatewayId): PagamentoConsultado;
+
+    /**
+     * Devolve o valor total do pagamento. A chave de idempotência garante
+     * que repetir a chamada (retry da fila) não estorne duas vezes.
+     *
+     * @throws FalhaGatewayPagamentoException
+     */
+    public function estornar(string $gatewayId, string $chaveIdempotencia): void;
 }
