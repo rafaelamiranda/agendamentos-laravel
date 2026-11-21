@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\EnviarLembretes;
 use App\Jobs\ExpirarReservasVencidas;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -13,4 +14,8 @@ Artisan::command('inspire', function () {
 // livre quando expira_em passa (ver Agendamento::ocupandoHorario).
 Schedule::job(new ExpirarReservasVencidas)
     ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::job(new EnviarLembretes)
+    ->everyFifteenMinutes()
     ->withoutOverlapping();

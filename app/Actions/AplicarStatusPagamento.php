@@ -4,12 +4,15 @@ namespace App\Actions;
 
 use App\Enums\StatusAgendamento;
 use App\Enums\StatusPagamento;
+use App\Jobs\EstornarPagamento;
+use App\Mail\AgendamentoConfirmado;
 use App\Models\Agendamento;
 use App\Models\Pagamento;
 use App\Models\Profissional;
 use App\Pagamentos\PagamentoConsultado;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Aplica ao pagamento e ao agendamento o estado informado pelo gateway.
@@ -46,6 +49,12 @@ class AplicarStatusPagamento
             if ($consultado->status === StatusPagamento::Aprovado) {
                 $pagamento->aprovado_em = $consultado->aprovadoEm ?? now();
                 $this->confirmarAgendamento($pagamento, $consultado);
+            }
+
+            // Estorno feito (por nós ou direto no painel do Mercado Pago).
+            if ($consultado->status === StatusPagamento::Estornado) {
+                $pagamento->estornado_em = now();
+                $pagamento->requer_estorno = false;
             }
 
             $pagamento->save();
@@ -99,13 +108,19 @@ class AplicarStatusPagamento
         }
 
         $agendamento->update(['status' => StatusAgendamento::Confirmado]);
+
+        // Na fila e só após o commit (ver EmailDeAgendamento).
+        Mail::to($agendamento->cliente->email)->queue(new AgendamentoConfirmado($agendamento));
     }
 
     private function marcarParaEstorno(Pagamento $pagamento, Agendamento $agendamento, string $motivo): void
     {
         $pagamento->requer_estorno = true;
 
-        Log::error('Pagamento aprovado sem confirmação do agendamento: requer estorno.', [
+        // Devolve sozinho; a flag só sai quando o estorno for confirmado.
+        EstornarPagamento::dispatch($pagamento->id)->afterCommit();
+
+        Log::warning('Pagamento aprovado sem confirmação do agendamento: estorno automático disparado.', [
             'pagamento_id' => $pagamento->id,
             'agendamento_id' => $agendamento->id,
             'motivo' => $motivo,

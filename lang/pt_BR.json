@@ -1,0 +1,6 @@
+{
+    "(and :count more error)": "(e mais :count erro)",
+    "(and :count more errors)": "(e mais :count erros)",
+    "The given data was invalid.": "Os dados informados são inválidos.",
+    "All rights reserved.": "Todos os direitos reservados."
+}

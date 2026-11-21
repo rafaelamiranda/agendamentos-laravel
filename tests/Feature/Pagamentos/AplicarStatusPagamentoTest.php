@@ -3,13 +3,18 @@
 use App\Actions\AplicarStatusPagamento;
 use App\Enums\StatusAgendamento;
 use App\Enums\StatusPagamento;
+use App\Jobs\EstornarPagamento;
 use App\Models\Agendamento;
 use App\Models\Pagamento;
 use App\Pagamentos\PagamentoConsultado;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     $this->freezeTime();
+    Queue::fake([EstornarPagamento::class]);
+    Mail::fake();
 
     $this->agendamento = Agendamento::factory()->pendente()->create(['sinal_centavos' => 3000]);
     $this->pagamento = Pagamento::factory()->for($this->agendamento)->create(['gateway_id' => '555']);
@@ -28,6 +33,8 @@ test('pagamento aprovado confirma o agendamento pendente', function () {
         ->aprovado_em->not->toBeNull()
         ->requer_estorno->toBeFalse()
         ->and($this->agendamento->fresh()->status)->toBe(StatusAgendamento::Confirmado);
+
+    Queue::assertNotPushed(EstornarPagamento::class);
 });
 
 test('o mesmo aviso aplicado duas vezes não muda nada na segunda', function () {
@@ -62,6 +69,8 @@ test('valor pago diferente do sinal não confirma e marca para estorno', functio
         ->status->toBe(StatusPagamento::Aprovado)
         ->requer_estorno->toBeTrue()
         ->and($this->agendamento->fresh()->status)->toBe(StatusAgendamento::Pendente);
+
+    Queue::assertPushed(EstornarPagamento::class, fn ($job) => $job->pagamentoId === $this->pagamento->id);
 });
 
 test('pagamento que chega depois da expiração confirma se o horário continua livre', function () {
@@ -85,6 +94,8 @@ test('pagamento que chega depois da expiração com o horário já ocupado marca
 
     expect($this->agendamento->fresh()->status)->toBe(StatusAgendamento::Expirado)
         ->and($this->pagamento->fresh()->requer_estorno)->toBeTrue();
+
+    Queue::assertPushed(EstornarPagamento::class, fn ($job) => $job->pagamentoId === $this->pagamento->id);
 });
 
 test('pagamento aprovado para agendamento cancelado marca para estorno', function () {
@@ -94,10 +105,23 @@ test('pagamento aprovado para agendamento cancelado marca para estorno', functio
 
     expect($this->agendamento->fresh()->status)->toBe(StatusAgendamento::Cancelado)
         ->and($this->pagamento->fresh()->requer_estorno)->toBeTrue();
+
+    Queue::assertPushed(EstornarPagamento::class, fn ($job) => $job->pagamentoId === $this->pagamento->id);
 });
 
 test('ignora pagamento que o sistema não conhece', function () {
     app(AplicarStatusPagamento::class)->executar(new PagamentoConsultado('999', StatusPagamento::Aprovado, 3000, now()));
 
     expect($this->agendamento->fresh()->status)->toBe(StatusAgendamento::Pendente);
+});
+
+test('aviso de estorno feito (até direto no painel do Mercado Pago) limpa a pendência', function () {
+    $this->pagamento->update(['status' => StatusPagamento::Aprovado, 'requer_estorno' => true]);
+
+    aplicarStatus(StatusPagamento::Estornado);
+
+    expect($this->pagamento->fresh())
+        ->status->toBe(StatusPagamento::Estornado)
+        ->estornado_em->not->toBeNull()
+        ->requer_estorno->toBeFalse();
 });
