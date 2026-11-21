@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\AgendamentoController;
 use App\Http\Controllers\Api\DisponibilidadeController;
+use App\Http\Controllers\Api\WebhookMercadoPagoController;
+use App\Http\Middleware\ValidarAssinaturaMercadoPago;
 use Illuminate\Support\Facades\Route;
 
 Route::get('profissionais/{profissional}/disponibilidade', DisponibilidadeController::class)
@@ -12,3 +14,7 @@ Route::get('profissionais/{profissional}/disponibilidade', DisponibilidadeContro
 Route::post('agendamentos', [AgendamentoController::class, 'store'])
     ->middleware('throttle:reservas')
     ->name('api.agendamentos.store');
+
+Route::post('webhooks/mercadopago', WebhookMercadoPagoController::class)
+    ->middleware(ValidarAssinaturaMercadoPago::class)
+    ->name('api.webhooks.mercadopago');
