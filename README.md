@@ -48,6 +48,32 @@ Usuário administrador do seeder: `admin@agendamentos.test`, senha `password`.
 ./vendor/bin/sail artisan test    # roda no banco "testing" do MySQL do Sail
 ```
 
+## API
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/api/profissionais/{id}/disponibilidade?servico_id=&data=AAAA-MM-DD` | Horários livres do profissional para o serviço no dia |
+| `POST` | `/api/agendamentos` | Reserva um horário; cria o agendamento `pendente` (5 por minuto por IP) |
+
+Exemplo de reserva:
+
+```json
+POST /api/agendamentos
+{
+  "profissional_id": 1,
+  "servico_id": 1,
+  "inicio": "2026-11-30T10:00:00-03:00",
+  "cliente": { "nome": "Maria Silva", "email": "maria@example.com", "telefone": "(11) 91234-5678" }
+}
+```
+
+| Resposta | Quando |
+|---|---|
+| `201` | Reserva criada, com `expira_em` = agora + prazo do sinal |
+| `409` | Horário indisponível: ocupado, fora da grade ou da jornada, fora da antecedência mínima ou máxima |
+| `422` | Dados inválidos, ou o profissional não realiza o serviço |
+| `429` | Limite de reservas por IP atingido |
+
 ## Modelo de domínio
 
 | Tabela | Conteúdo |
@@ -86,11 +112,33 @@ Status do agendamento (`App\Enums\StatusAgendamento`): `pendente` (aguardando si
 
 **Jornadas não cruzam a meia-noite.** Cada jornada é uma faixa dentro do dia (`inicio < fim`). Turnos noturnos seriam duas jornadas, uma em cada dia. Não é o caso de salão, clínica ou estúdio.
 
+**Lock na linha do profissional, não nos agendamentos.** A reserva roda numa transação que começa com `SELECT ... FOR UPDATE` na linha do profissional (`ReservarHorario`). Duas reservas para o mesmo profissional passam uma de cada vez: a segunda espera o commit da primeira e, ao conferir a agenda, já enxerga o agendamento novo. Travar os agendamentos em conflito não resolve. Quando o horário está livre não há linha para travar, e um `FOR UPDATE` sem resultado não impede o insert de outra transação. A linha do profissional sempre existe e funciona como mutex por profissional, sem bloquear a agenda dos outros.
+
+**O lock é a primeira consulta da transação.** No REPEATABLE READ do MySQL, o snapshot da transação nasce na primeira leitura comum. Se alguma leitura viesse antes do lock, a reserva que esperou conferiria a agenda com uma foto antiga e não veria a reserva concorrente. O teste de concorrência prova isso: com uma leitura antes do lock, ele detecta um agendamento duplicado.
+
+**A foreign key não substitui o lock.** O `INSERT` em `agendamentos` pede um lock compartilhado na linha do profissional por causa da foreign key, então ele também espera. Mas espera depois de a agenda já ter sido conferida com dados antigos, e por isso gera duplicata. O lock explícito faz a espera acontecer antes da conferência.
+
+**Testes de concorrência com processo separado.** `tests/Concorrencia` segura o lock numa segunda conexão e dispara a reserva num outro processo PHP, que fica esperando. Enquanto isso, o teste ocupa o horário e faz commit, e então confere que o outro processo recusou. Essa suíte usa `DatabaseTruncation` em vez de `RefreshDatabase`, porque dados dentro de uma transação não confirmada seriam invisíveis para a outra conexão.
+
+**A disponibilidade não fica no Form Request.** O Form Request valida o formato e o vínculo profissional–serviço. Se o horário está livre depende do estado da agenda, e só é conferido com segurança dentro da transação, com o lock.
+
+**409 para horário indisponível, 422 para dados inválidos.** Um horário ocupado não é erro de preenchimento: o pedido é válido, mas conflita com o estado atual da agenda. O `409 Conflict` deixa o front tratar os dois casos de forma diferente ("escolha outro horário" e "corrija o formulário").
+
+**Datas da API em ISO 8601 com deslocamento.** A API devolve `2026-11-30T10:00:00-03:00` e aceita qualquer fuso na entrada, convertendo para o horário de Brasília antes de calcular o dia. `13:00Z` vira 10:00 em Brasília.
+
+**Cliente identificado pelo e-mail, sem conta.** A reserva faz `updateOrCreate` pelo e-mail (normalizado em minúsculas), e nome e telefone ficam com os dados mais recentes. Assim o cliente reserva sem cadastro e o histórico fica agrupado.
+
+**Limite de reservas por IP.** Cada pendente segura um horário durante o prazo do sinal. Sem limite, um único IP poderia ocupar a agenda inteira sem pagar. O limite é de 5 reservas por minuto por IP (`RateLimiter` `reservas`).
+
+**Antecedência mínima e máxima.** Um horário só pode ser reservado a partir de agora + 120 min e até hoje + 60 dias (configuráveis). O limite máximo evita reservas para meses à frente, quando preços e jornadas ainda podem mudar.
+
+**Mensagens em português sem pacote.** `lang/pt_BR` foi traduzido à mão (validação, autenticação, senhas, paginação), e os nomes dos campos foram mapeados ("O campo serviço é obrigatório"). O idioma de fallback é `en`, para que uma chave sem tradução apareça em inglês, nunca como texto cru.
+
 **`restrictOnDelete` nos agendamentos.** Agendamento é histórico financeiro. Apagar profissional, serviço ou cliente que tenha agendamentos falha no banco; o caminho certo é desativar o cadastro (`ativo`). Jornadas, bloqueios e o vínculo com serviços são dados do próprio profissional e usam `cascadeOnDelete`.
 
 **Índice `(profissional_id, inicio, fim)`.** Atende a consulta mais frequente do sistema: "agendamentos deste profissional que cruzam este intervalo". Ela é usada no cálculo de disponibilidade e na checagem de conflito da reserva.
 
-**Testes em MySQL, não em SQLite.** A reserva vai usar lock de linha (`SELECT ... FOR UPDATE`), que o SQLite não implementa. Testar no mesmo banco de produção evita que um teste passe por acaso. Por isso o CI sobe um service container MySQL.
+**Testes em MySQL, não em SQLite.** A reserva usa lock de linha (`SELECT ... FOR UPDATE`), que o SQLite não implementa. Testar no mesmo banco de produção evita que um teste passe por acaso. Por isso o CI sobe um service container MySQL.
 
 **Testes sem build do front.** O `TestCase` chama `withoutVite()`. Os testes cobrem o backend e não dependem de `public/build`, então o job de testes do CI não precisa de Node.
 
