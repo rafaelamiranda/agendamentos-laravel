@@ -4,9 +4,16 @@ use App\Models\Jornada;
 use App\Models\Profissional;
 use App\Models\Servico;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     $this->travelTo(CarbonImmutable::parse('2026-11-27 08:00'));
+
+    // Cada reserva criada gera um Pix: o Mercado Pago é simulado.
+    Http::fake(['api.mercadopago.com/v1/payments' => fn () => Http::response(
+        respostaPagamentoMercadoPago(['id' => fake()->unique()->numberBetween(1, 999_999_999)]),
+        201,
+    )]);
 
     config([
         'agendamentos.antecedencia_minima_minutos' => 120,

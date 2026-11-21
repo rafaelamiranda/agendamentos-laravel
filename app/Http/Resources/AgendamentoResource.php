@@ -40,6 +40,7 @@ class AgendamentoResource extends JsonResource
                 'nome' => $this->cliente->nome,
                 'email' => $this->cliente->email,
             ],
+            'pagamento' => PagamentoResource::make($this->whenLoaded('pagamento')),
         ];
     }
 }

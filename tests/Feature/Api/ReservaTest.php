@@ -1,16 +1,29 @@
 <?php
 
 use App\Enums\StatusAgendamento;
+use App\Enums\StatusPagamento;
 use App\Models\Agendamento;
 use App\Models\Cliente;
 use App\Models\Jornada;
+use App\Models\Pagamento;
 use App\Models\Profissional;
 use App\Models\Servico;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 // "Agora": sexta 27/11/2026 08:00. Reservas para segunda 30/11.
 beforeEach(function () {
     $this->travelTo(CarbonImmutable::parse('2026-11-27 08:00'));
+
+    // Cada reserva criada gera um Pix: o Mercado Pago é simulado. A resposta
+    // fica numa propriedade para um teste poder simular o gateway fora do ar
+    // (um segundo Http::fake não substituiria este: vale o primeiro stub).
+    $this->respostaMercadoPago = fn () => Http::response(
+        respostaPagamentoMercadoPago(['id' => fake()->unique()->numberBetween(1, 999_999_999)]),
+        201,
+    );
+    Http::fake(['api.mercadopago.com/v1/payments' => fn () => ($this->respostaMercadoPago)()]);
 
     config([
         'agendamentos.antecedencia_minima_minutos' => 120,
@@ -192,4 +205,35 @@ test('limita as reservas por IP', function () {
     }
 
     $this->postJson(route('api.agendamentos.store'), [])->assertTooManyRequests();
+});
+
+test('a reserva devolve o Pix do sinal para pagamento', function () {
+    $this->postJson(route('api.agendamentos.store'), ($this->payload)())
+        ->assertCreated()
+        ->assertJsonPath('data.pagamento.status.valor', 'pendente')
+        ->assertJsonPath('data.pagamento.valor_centavos', 3000)
+        ->assertJsonPath('data.pagamento.pix.qr_code_base64', 'iVBORw0KGgoAAAANSUhEUgAAAAE=')
+        ->assertJsonPath('data.pagamento.expira_em', '2026-11-27T08:15:00-03:00');
+
+    expect(Pagamento::sole())
+        ->status->toBe(StatusPagamento::Pendente)
+        ->valor_centavos->toBe(3000)
+        ->agendamento_id->toBe(Agendamento::sole()->id);
+});
+
+test('se o Pix não puder ser gerado, a reserva é desfeita e o horário fica livre', function () {
+    Sleep::fake();
+    $respostaNormal = $this->respostaMercadoPago;
+    $this->respostaMercadoPago = fn () => Http::response(['message' => 'erro'], 500);
+
+    $this->postJson(route('api.agendamentos.store'), ($this->payload)())
+        ->assertStatus(503)
+        ->assertJsonPath('message', 'Não foi possível gerar o Pix agora. Tente reservar novamente em instantes.');
+
+    expect(Agendamento::sole()->status)->toBe(StatusAgendamento::Expirado)
+        ->and(Pagamento::count())->toBe(0);
+
+    // O horário volta para a disponibilidade na hora.
+    $this->respostaMercadoPago = $respostaNormal;
+    $this->postJson(route('api.agendamentos.store'), ($this->payload)())->assertCreated();
 });
