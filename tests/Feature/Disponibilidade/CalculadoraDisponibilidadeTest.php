@@ -19,6 +19,7 @@ beforeEach(function () {
     config([
         'agendamentos.antecedencia_minima_minutos' => 120,
         'agendamentos.intervalo_grade_minutos' => 30,
+        'agendamentos.antecedencia_maxima_dias' => 60,
     ]);
 
     $this->servico = Servico::factory()->create(['duracao_minutos' => 60]);
@@ -200,5 +201,29 @@ test('o número de consultas não cresce com a quantidade de ocupações', funct
 });
 
 test('rejeita intervalo de grade inválido', function () {
-    new CalculadoraDisponibilidade(antecedenciaMinimaMinutos: 120, intervaloGradeMinutos: 0);
+    new CalculadoraDisponibilidade(antecedenciaMinimaMinutos: 120, intervaloGradeMinutos: 0, antecedenciaMaximaDias: 60);
 })->throws(InvalidArgumentException::class);
+
+test('respeita a antecedência máxima, com o último dia incluído', function () {
+    // Agora: sexta 27/11/2026. Com 3 dias, a agenda vai até segunda 30/11.
+    config(['agendamentos.antecedencia_maxima_dias' => 3]);
+    expect(horariosLivres($this->profissional, $this->servico))->toHaveCount(17);
+
+    config(['agendamentos.antecedencia_maxima_dias' => 2]);
+    expect(horariosLivres($this->profissional, $this->servico))->toBeEmpty();
+});
+
+test('estaLivre aceita só horários da grade que estão livres', function (string $hora, bool $livre) {
+    ocupar(Agendamento::class, $this->profissional, '14:00', '15:00');
+
+    $calculadora = app(CalculadoraDisponibilidade::class);
+
+    expect($calculadora->estaLivre($this->profissional, $this->servico, CarbonImmutable::parse(SEGUNDA.' '.$hora)))
+        ->toBe($livre);
+})->with([
+    'livre na grade' => ['10:00', true],
+    'fora da grade' => ['10:15', false],
+    'ocupado' => ['14:00', false],
+    'encosta no ocupado' => ['15:00', true],
+    'fora da jornada' => ['18:00', false],
+]);
