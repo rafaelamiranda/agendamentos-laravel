@@ -81,6 +81,24 @@ Em http://localhost:8080, entre com o administrador do seeder (`admin@agendament
 
 O painel é só para administradores (coluna `users.administrador`); o cadastro público do starter kit está desligado.
 
+## E-mails e cancelamento
+
+Os e-mails saem pela fila e, em desenvolvimento, aparecem no Mailpit (http://localhost:8025):
+
+| E-mail | Quando |
+|---|---|
+| Agendamento confirmado | O pagamento do sinal é aprovado; traz valores, o que falta pagar no dia e o link de cancelamento |
+| Lembrete | Até 24 h antes do horário (job a cada 15 min); não sai para quem reservou já dentro dessas 24 h |
+| Agendamento cancelado | Cancelamento pelo cliente ou pelo estabelecimento; diz o que acontece com o sinal |
+
+**Política de cancelamento** (`AGENDAMENTO_PRAZO_CANCELAMENTO_HORAS`, padrão 24):
+
+| Quem cancela | Quando | Sinal |
+|---|---|---|
+| Cliente, pelo link do e-mail | Até 24 h antes | Devolvido automaticamente (estorno no Mercado Pago) |
+| Cliente, pelo link do e-mail | Com menos de 24 h | Retido; o horário é liberado |
+| Estabelecimento, pelo painel | A qualquer momento antes do horário | Sempre devolvido |
+
 ## API
 
 | Método | Rota | O que faz |
@@ -202,6 +220,16 @@ Status do agendamento (`App\Enums\StatusAgendamento`): `pendente` (aguardando si
 **Excluir cadastro com histórico mostra um aviso, não um erro 500.** O banco já recusaria (`restrictOnDelete`), mas o controller checa antes e orienta a desativar o cadastro.
 
 **Preço digitado em reais, gravado em centavos, sem float.** O formulário aceita "120,50", "1.234,56" ou "120.5". `Dinheiro::paraCentavos` converte separando reais e centavos como texto: `0,29` vira 29, enquanto por float daria 28 (`0.29 * 100 = 28.999…`).
+
+**Cancelamento pelo cliente sem login, com URL assinada.** O e-mail traz um link `URL::temporarySignedRoute` que expira no horário do atendimento. A assinatura cobre o id, então trocar o número na URL invalida o link. O `GET` só mostra a confirmação e avisa antes se o sinal volta ou não; quem cancela é o `POST`, também assinado. Leitores de e-mail e antivírus abrem links sozinhos, e um `GET` que cancelasse faria o cliente perder o horário sem clicar em nada.
+
+**Estorno automático, na fila e idempotente.** Quando o sinal deve voltar, o pagamento recebe `requer_estorno = true` e o job `EstornarPagamento` chama `POST /v1/payments/{id}/refunds` com `X-Idempotency-Key: estorno-pagamento-{id}`. Um retry da fila nunca estorna duas vezes. A flag só sai quando o estorno é confirmado, pelo job ou pelo aviso `refunded` do webhook, até se alguém estornar direto no painel do Mercado Pago. Se as 5 tentativas falharem, a pendência continua visível e o caso vai para o log. Os pagamentos "aprovados sem como confirmar" da etapa de pagamento (horário tomado, valor divergente, agendamento cancelado) também passaram a ser estornados sozinhos.
+
+**Mesma ordem de locks em todo lugar.** Cancelamento e webhook podem mexer no mesmo agendamento ao mesmo tempo (o cliente cancela enquanto o Pix é aprovado). Os dois travam primeiro o pagamento e depois o agendamento; com ordens diferentes, cada transação poderia segurar o que a outra espera e o MySQL abortaria uma por deadlock. Quem chega depois vê o estado final: se o cancelamento venceu, o pagamento aprovado vai para estorno.
+
+**Efeitos colaterais só depois do commit.** E-mails e o job de estorno são enfileirados com `afterCommit`. Se a transação do cancelamento ou da confirmação fosse desfeita, não sairia um e-mail de algo que não aconteceu, nem um estorno de um agendamento que continua ativo.
+
+**Lembrete por janela, com "reserva" por UPDATE condicional.** O job procura confirmados que começam nas próximas 24 h e ainda não receberam lembrete, em vez de mirar o instante exato de 24 h antes. Assim, um agendador parado por um tempo não perde lembretes. Antes de enviar, ele faz `UPDATE ... SET lembrete_enviado_em = agora WHERE id = ? AND lembrete_enviado_em IS NULL` e só envia se afetou 1 linha: duas execuções simultâneas nunca mandam o mesmo lembrete duas vezes.
 
 **`restrictOnDelete` nos agendamentos.** Agendamento é histórico financeiro. Apagar profissional, serviço ou cliente que tenha agendamentos falha no banco; o caminho certo é desativar o cadastro (`ativo`). Jornadas, bloqueios e o vínculo com serviços são dados do próprio profissional e usam `cascadeOnDelete`.
 
