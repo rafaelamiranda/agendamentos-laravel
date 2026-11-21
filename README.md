@@ -65,7 +65,21 @@ Os testes não dependem disso: todas as chamadas ao Mercado Pago são simuladas 
 ./vendor/bin/sail pint            # estilo
 ./vendor/bin/sail php vendor/bin/phpstan analyse
 ./vendor/bin/sail artisan test    # roda no banco "testing" do MySQL do Sail
+./vendor/bin/sail npm run types:check   # TypeScript do painel
+./vendor/bin/sail npm run build         # o build precisa rodar no Sail: o Wayfinder chama o php
 ```
+
+## Painel
+
+Em http://localhost:8080, entre com o administrador do seeder (`admin@agendamentos.test` / `password`). O seeder cria uma semana de agenda de demonstração: atendimentos concluídos no passado, confirmados e aguardando sinal no futuro, e almoço bloqueado nos dias úteis.
+
+| Tela | O que faz |
+|---|---|
+| Agenda | Grade visual por **dia** (uma coluna por profissional) ou por **semana** (um profissional, segunda a domingo), com expediente, bloqueios e agendamentos por status; clique num atendimento para ver cliente, valores e prazo do sinal |
+| Profissionais | Cadastro, serviços que cada um realiza, jornadas por dia da semana e bloqueios (folgas, férias, almoço) |
+| Serviços | Cadastro com duração, preço e sinal digitados em reais |
+
+O painel é só para administradores (coluna `users.administrador`); o cadastro público do starter kit está desligado.
 
 ## API
 
@@ -176,6 +190,18 @@ Status do agendamento (`App\Enums\StatusAgendamento`): `pendente` (aguardando si
 **O Pix vence junto com a reserva.** A cobrança é criada com `date_of_expiration` igual ao `expira_em` da reserva. Depois disso, o Mercado Pago não aceita mais o pagamento de um horário que já voltou para a agenda.
 
 **Job de expiração só arruma o status.** `ExpirarReservasVencidas` roda a cada minuto (`withoutOverlapping`) e marca os pendentes vencidos como `expirado` num único `UPDATE`. O horário já ficou livre antes, no instante em que `expira_em` passou, por causa do scope `ocupandoHorario`. Então um atraso do job não prende horário de ninguém.
+
+**Painel só para administradores, com policies.** Cada model tem a sua policy (`ProfissionalPolicy`, `ServicoPolicy`...), descoberta pelo nome. Todas herdam de `PolicyDeAdministrador`, porque hoje a regra é a mesma. Se um dia o profissional tiver login para ver só a própria agenda, a regra muda na policy dele, sem mexer nos controllers. A coluna `administrador` fica fora do `$fillable`: a tela de perfil não consegue promover ninguém por mass assignment (há teste para isso). O cadastro público do Fortify foi desligado, porque qualquer pessoa poderia criar uma conta.
+
+**Agenda montada no servidor, desenhada no cliente.** `MontarAgenda` entrega as colunas prontas (jornadas, bloqueios e agendamentos com hora `HH:MM` do próprio dia). O React só posiciona os blocos (minutos × pixels) e não precisa de biblioteca de datas nem de lógica de fuso no navegador. Os dados do período inteiro vêm em poucas consultas e são distribuídos em memória; um teste garante que o número de consultas não cresce com a quantidade de agendamentos. Bloqueios de vários dias (férias) são recortados para cada dia da coluna.
+
+**Rotas aninhadas com binding com escopo.** Jornadas e bloqueios ficam em `/profissionais/{profissional}/jornadas/{jornada}` com `scoped()`. O Laravel busca a jornada entre as do profissional da URL, então trocar o id na URL dá 404 em vez de editar o registro de outra pessoa.
+
+**Bloqueio não passa por cima de cliente marcado.** Criar um bloqueio num período com agendamentos que ocupam horário é recusado, com a contagem de quantos são. Cancelar e avisar o cliente é decisão do estabelecimento, e não deve acontecer como efeito colateral de um bloqueio.
+
+**Excluir cadastro com histórico mostra um aviso, não um erro 500.** O banco já recusaria (`restrictOnDelete`), mas o controller checa antes e orienta a desativar o cadastro.
+
+**Preço digitado em reais, gravado em centavos, sem float.** O formulário aceita "120,50", "1.234,56" ou "120.5". `Dinheiro::paraCentavos` converte separando reais e centavos como texto: `0,29` vira 29, enquanto por float daria 28 (`0.29 * 100 = 28.999…`).
 
 **`restrictOnDelete` nos agendamentos.** Agendamento é histórico financeiro. Apagar profissional, serviço ou cliente que tenha agendamentos falha no banco; o caminho certo é desativar o cadastro (`ativo`). Jornadas, bloqueios e o vínculo com serviços são dados do próprio profissional e usam `cascadeOnDelete`.
 
