@@ -51,7 +51,38 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Corpo de resposta do Mercado Pago para POST/GET /v1/payments, no formato
+ * da documentação, com os campos que o sistema usa.
+ *
+ * @param  array<string, mixed>  $sobrescrever
+ * @return array<string, mixed>
+ */
+function respostaPagamentoMercadoPago(array $sobrescrever = []): array
 {
-    // ..
+    return array_replace_recursive([
+        'id' => 1325461234,
+        'status' => 'pending',
+        'status_detail' => 'pending_waiting_transfer',
+        'transaction_amount' => 30,
+        'date_approved' => null,
+        // O Mercado Pago costuma responder em -04:00; o sistema converte.
+        'date_of_expiration' => '2026-11-27T07:15:00.000-04:00',
+        'external_reference' => '1',
+        'point_of_interaction' => [
+            'transaction_data' => [
+                'qr_code' => '00020126580014br.gov.bcb.pix0136chave-pix-teste5204000053039865802BR6304ABCD',
+                'qr_code_base64' => 'iVBORw0KGgoAAAANSUhEUgAAAAE=',
+                'ticket_url' => 'https://www.mercadopago.com.br/payments/1325461234/ticket',
+            ],
+        ],
+    ], $sobrescrever);
+}
+
+/** Header x-signature válido para o segredo dos testes (phpunit.xml). */
+function assinaturaWebhook(string $dataId, string $requestId, int $ts): string
+{
+    $manifesto = 'id:'.strtolower($dataId).";request-id:{$requestId};ts:{$ts};";
+
+    return "ts={$ts},v1=".hash_hmac('sha256', $manifesto, 'segredo-de-teste');
 }

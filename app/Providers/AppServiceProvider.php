@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Pagamentos\GatewayPix;
+use App\Pagamentos\MercadoPagoGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -18,7 +20,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // O domínio depende da interface; a implementação fica num só lugar.
+        $this->app->bind(GatewayPix::class, MercadoPagoGateway::class);
     }
 
     /**

@@ -30,6 +30,9 @@
         <env name="DB_DATABASE" value="testing"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="MERCADOPAGO_ACCESS_TOKEN" value="TEST-token-de-teste"/>
+        <env name="MERCADOPAGO_WEBHOOK_SECRET" value="segredo-de-teste"/>
+        <env name="MERCADOPAGO_NOTIFICATION_URL" value="https://agendamentos.test/api/webhooks/mercadopago"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

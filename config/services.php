@@ -28,6 +28,20 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'mercadopago' => [
+        'base_url' => env('MERCADOPAGO_BASE_URL', 'https://api.mercadopago.com'),
+        // Credencial de teste (sandbox) começa com "TEST-".
+        'access_token' => env('MERCADOPAGO_ACCESS_TOKEN'),
+        // Assinatura secreta do webhook (painel > Webhooks > Configurar notificações).
+        'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
+        // URL pública do webhook. Em desenvolvimento, um túnel (ngrok etc.);
+        // se ficar vazia, usa a URL configurada no painel do Mercado Pago.
+        'notification_url' => env('MERCADOPAGO_NOTIFICATION_URL'),
+        // Tolerância para o horário da assinatura: recusa notificações
+        // antigas reenviadas por terceiros (replay).
+        'tolerancia_assinatura_segundos' => (int) env('MERCADOPAGO_TOLERANCIA_ASSINATURA_SEGUNDOS', 300),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
