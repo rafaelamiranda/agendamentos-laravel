@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrigemCancelamento;
 use App\Enums\StatusAgendamento;
 use App\Models\Concerns\TemIntervalo;
 use Carbon\CarbonImmutable;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int $sinal_centavos
  * @property CarbonImmutable|null $expira_em
  * @property CarbonImmutable|null $cancelado_em
+ * @property OrigemCancelamento|null $cancelado_por
+ * @property CarbonImmutable|null $lembrete_enviado_em
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -46,6 +49,8 @@ class Agendamento extends Model
         'sinal_centavos',
         'expira_em',
         'cancelado_em',
+        'cancelado_por',
+        'lembrete_enviado_em',
     ];
 
     protected function casts(): array
@@ -56,6 +61,8 @@ class Agendamento extends Model
             'sinal_centavos' => 'integer',
             'expira_em' => 'datetime',
             'cancelado_em' => 'datetime',
+            'cancelado_por' => OrigemCancelamento::class,
+            'lembrete_enviado_em' => 'datetime',
         ];
     }
 
@@ -75,6 +82,12 @@ class Agendamento extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class);
+    }
+
+    public function podeSerCancelado(): bool
+    {
+        return in_array($this->status, [StatusAgendamento::Pendente, StatusAgendamento::Confirmado], true)
+            && $this->inicio->isFuture();
     }
 
     /** @return HasOne<Pagamento, $this> */

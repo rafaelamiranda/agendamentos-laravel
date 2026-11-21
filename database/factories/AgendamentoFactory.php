@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\OrigemCancelamento;
 use App\Enums\StatusAgendamento;
 use App\Models\Agendamento;
 use App\Models\Cliente;
@@ -76,6 +77,7 @@ class AgendamentoFactory extends Factory
         return $this->state(fn () => [
             'status' => StatusAgendamento::Cancelado,
             'cancelado_em' => now(),
+            'cancelado_por' => OrigemCancelamento::Cliente,
         ]);
     }
 

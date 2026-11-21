@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $pix_qr_code_base64
  * @property CarbonImmutable $expira_em
  * @property CarbonImmutable|null $aprovado_em
+ * @property CarbonImmutable|null $estornado_em
  * @property bool $requer_estorno
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -43,6 +44,7 @@ class Pagamento extends Model
         'pix_qr_code_base64',
         'expira_em',
         'aprovado_em',
+        'estornado_em',
         'requer_estorno',
     ];
 
@@ -53,6 +55,7 @@ class Pagamento extends Model
             'valor_centavos' => 'integer',
             'expira_em' => 'datetime',
             'aprovado_em' => 'datetime',
+            'estornado_em' => 'datetime',
             'requer_estorno' => 'boolean',
         ];
     }

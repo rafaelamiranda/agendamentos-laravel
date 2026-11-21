@@ -28,4 +28,16 @@ return [
     */
     'prazo_pagamento_minutos' => (int) env('AGENDAMENTO_PRAZO_PAGAMENTO_MINUTOS', 15),
 
+    /*
+    | Cancelando com pelo menos esta antecedência, o cliente recebe o sinal
+    | de volta. Depois disso ainda pode cancelar, mas o sinal fica com o
+    | estabelecimento, que provavelmente não consegue mais preencher o horário.
+    */
+    'prazo_cancelamento_horas' => (int) env('AGENDAMENTO_PRAZO_CANCELAMENTO_HORAS', 24),
+
+    /*
+    | Quanto tempo antes do horário o cliente recebe o lembrete por e-mail.
+    */
+    'lembrete_horas_antes' => (int) env('AGENDAMENTO_LEMBRETE_HORAS_ANTES', 24),
+
 ];
