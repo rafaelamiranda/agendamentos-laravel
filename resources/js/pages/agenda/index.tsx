@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Form, Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import CancelamentoController from '@/actions/App/Http/Controllers/Painel/CancelamentoController';
 import {
     CORES_STATUS,
     GradeAgenda,
@@ -13,6 +14,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -239,16 +241,85 @@ export default function Agenda(props: Props) {
                                 <dt className="text-muted-foreground">Sinal</dt>
                                 <dd>
                                     {formatarReais(selecionado.sinal_centavos)}
+                                    {selecionado.sinal_pago && ' · pago'}
                                     {selecionado.status.valor === 'pendente' &&
                                         selecionado.expira_em &&
                                         ` · aguardando até ${selecionado.expira_em}`}
                                 </dd>
                             </dl>
+
+                            {selecionado.pode_cancelar && (
+                                <CancelarAgendamento
+                                    agendamento={selecionado}
+                                    aoCancelar={() => setSelecionado(null)}
+                                />
+                            )}
                         </>
                     )}
                 </DialogContent>
             </Dialog>
         </>
+    );
+}
+
+/**
+ * Cancelamento pelo estabelecimento: pede confirmação e avisa que o sinal
+ * pago volta para o cliente (a regra de prazo só vale para o cliente).
+ */
+function CancelarAgendamento({
+    agendamento,
+    aoCancelar,
+}: {
+    agendamento: AgendamentoNaGrade;
+    aoCancelar: () => void;
+}) {
+    const [confirmando, setConfirmando] = useState(false);
+
+    if (!confirmando) {
+        return (
+            <DialogFooter>
+                <Button
+                    variant="outline"
+                    className="text-destructive"
+                    onClick={() => setConfirmando(true)}
+                >
+                    Cancelar agendamento
+                </Button>
+            </DialogFooter>
+        );
+    }
+
+    return (
+        <Form
+            {...CancelamentoController.form(agendamento.id)}
+            options={{ preserveScroll: true }}
+            onSuccess={aoCancelar}
+            className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"
+        >
+            {({ processing }) => (
+                <>
+                    <p>
+                        O horário será liberado e {agendamento.cliente.nome}{' '}
+                        receberá um e-mail.{' '}
+                        {agendamento.sinal_pago
+                            ? `O sinal de ${formatarReais(agendamento.sinal_centavos)} será devolvido automaticamente.`
+                            : 'O sinal ainda não foi pago, então não há valor a devolver.'}
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setConfirmando(false)}
+                        >
+                            Voltar
+                        </Button>
+                        <Button variant="destructive" disabled={processing}>
+                            Confirmar cancelamento
+                        </Button>
+                    </div>
+                </>
+            )}
+        </Form>
     );
 }
 

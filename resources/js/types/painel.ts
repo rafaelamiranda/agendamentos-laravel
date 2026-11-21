@@ -18,6 +18,8 @@ export type AgendamentoNaGrade = FaixaHorario & {
     valor_centavos: number;
     sinal_centavos: number;
     expira_em: string | null;
+    sinal_pago: boolean;
+    pode_cancelar: boolean;
 };
 
 export type BloqueioNaGrade = FaixaHorario & {

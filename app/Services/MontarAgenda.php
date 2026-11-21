@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\StatusPagamento;
 use App\Models\Agendamento;
 use App\Models\Bloqueio;
 use App\Models\Jornada;
@@ -87,7 +88,7 @@ class MontarAgenda
                 ->whereIn('profissional_id', $ids)
                 ->ocupandoHorario()
                 ->sobrepondo($inicio, $fim)
-                ->with('cliente', 'servico')
+                ->with('cliente', 'servico', 'pagamento')
                 ->orderBy('inicio')
                 ->get(),
         ];
@@ -145,6 +146,8 @@ class MontarAgenda
                     'valor_centavos' => $agendamento->valor_centavos,
                     'sinal_centavos' => $agendamento->sinal_centavos,
                     'expira_em' => $agendamento->expira_em?->format('d/m H:i'),
+                    'sinal_pago' => $agendamento->pagamento?->status === StatusPagamento::Aprovado,
+                    'pode_cancelar' => $agendamento->podeSerCancelado(),
                 ])
                 ->values(),
         ];

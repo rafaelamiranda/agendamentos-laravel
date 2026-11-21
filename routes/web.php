@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\CancelamentoClienteController;
 use App\Http\Controllers\Painel\AgendaController;
 use App\Http\Controllers\Painel\BloqueioController;
+use App\Http\Controllers\Painel\CancelamentoController;
 use App\Http\Controllers\Painel\JornadaController;
 use App\Http\Controllers\Painel\ProfissionalController;
 use App\Http\Controllers\Painel\ServicoController;
@@ -11,11 +13,22 @@ use Illuminate\Support\Facades\Route;
 // direto para o painel (o login, para quem não está autenticado).
 Route::redirect('/', '/agenda')->name('home');
 
+// Cancelamento pelo cliente, sem login: a assinatura da URL é a
+// autorização (não dá para trocar o id), e o link expira no horário.
+Route::middleware(['signed', 'throttle:20,1'])->group(function () {
+    Route::get('agendamentos/{agendamento}/cancelamento', [CancelamentoClienteController::class, 'mostrar'])
+        ->name('agendamentos.cancelamento');
+    Route::post('agendamentos/{agendamento}/cancelamento', [CancelamentoClienteController::class, 'confirmar'])
+        ->name('agendamentos.cancelamento.confirmar');
+});
+
 Route::middleware(['auth', 'verified'])->group(function () {
     // Mantido pelo starter kit (Fortify redireciona para cá após o login).
     Route::redirect('dashboard', '/agenda')->name('dashboard');
 
     Route::get('agenda', AgendaController::class)->name('agenda');
+    Route::post('agenda/agendamentos/{agendamento}/cancelamento', CancelamentoController::class)
+        ->name('agenda.cancelamento');
 
     Route::resource('profissionais', ProfissionalController::class)
         ->parameters(['profissionais' => 'profissional'])
