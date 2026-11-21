@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Models\Agendamento;
 use App\Models\Cliente;
 use App\Models\Profissional;
 use App\Models\Servico;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,7 +18,7 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        User::factory()->create([
+        User::factory()->administrador()->create([
             'name' => 'Administrador',
             'email' => 'admin@agendamentos.test',
         ]);
@@ -60,6 +63,68 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        Cliente::factory(10)->create();
+        $clientes = Cliente::factory(10)->create();
+
+        $this->agendaDeDemonstracao($clientes);
+    }
+
+    /**
+     * Uma semana de agenda (da segunda passada até a próxima) para o painel
+     * não abrir vazio: almoço bloqueado nos dias úteis e alguns atendimentos
+     * por dia. Os do passado ficam concluídos; um de cada dia futuro fica
+     * aguardando o sinal.
+     *
+     * @param  Collection<int, Cliente>  $clientes
+     */
+    private function agendaDeDemonstracao(Collection $clientes): void
+    {
+        $horarios = ['09:00', '10:30', '14:00', '15:30'];
+        $inicioDoPeriodo = CarbonImmutable::today()->startOfWeek(CarbonImmutable::MONDAY);
+
+        foreach (Profissional::with('servicos', 'jornadas')->get() as $profissional) {
+            foreach (range(0, 13) as $deslocamento) {
+                $dia = $inicioDoPeriodo->addDays($deslocamento);
+
+                if ($profissional->jornadas->where('dia_semana', $dia->dayOfWeek)->isEmpty()) {
+                    continue;
+                }
+
+                if (! $dia->isSaturday()) {
+                    $profissional->bloqueios()->create([
+                        'inicio' => $dia->setTime(12, 0),
+                        'fim' => $dia->setTime(13, 0),
+                        'motivo' => 'Almoço',
+                    ]);
+                }
+
+                // Sábado só tem a manhã; nos outros dias, três dos quatro horários.
+                $doDia = $dia->isSaturday()
+                    ? ['09:00', '10:30']
+                    : collect($horarios)->shuffle()->take(3)->sort()->values()->all();
+
+                foreach ($doDia as $indice => $hora) {
+                    $inicio = $dia->setTimeFromTimeString($hora);
+                    $servico = $profissional->servicos->random();
+
+                    // Serviços longos não podem invadir o almoço nem o fim do sábado.
+                    if ($servico->duracao_minutos > 90) {
+                        $servico = $profissional->servicos->sortBy('duracao_minutos')->first();
+                    }
+
+                    $estado = match (true) {
+                        $inicio->isPast() => 'concluido',
+                        $indice === 0 => 'pendente',
+                        default => 'confirmado',
+                    };
+
+                    Agendamento::factory()->{$estado}()->create([
+                        'profissional_id' => $profissional->id,
+                        'servico_id' => $servico->id,
+                        'cliente_id' => $clientes->random()->id,
+                        'inicio' => $inicio,
+                    ]);
+                }
+            }
+        }
     }
 }
