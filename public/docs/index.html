@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>API de Agendamentos</title>
+
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../docs/css/theme-default.style.css" media="screen">
+    <link rel="stylesheet" href="../docs/css/theme-default.print.css" media="print">
+
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.10/lodash.min.js"></script>
+
+    <link rel="stylesheet"
+          href="https://unpkg.com/@highlightjs/cdn-assets@11.6.0/styles/obsidian.min.css">
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.6.0/highlight.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jets/0.14.1/jets.min.js"></script>
+
+    <style id="language-style">
+        /* starts out as display none and is replaced with js later  */
+                    body .content .bash-example code { display: none; }
+                    body .content .javascript-example code { display: none; }
+            </style>
+
+    <script>
+        var tryItOutBaseUrl = "http://localhost:8080";
+        var useCsrf = Boolean();
+        var csrfUrl = "/sanctum/csrf-cookie";
+    </script>
+    <script src="../docs/js/tryitout-5.11.0.js"></script>
+
+    <script src="../docs/js/theme-default-5.11.0.js"></script>
+
+</head>
+
+<body data-languages="[&quot;bash&quot;,&quot;javascript&quot;]">
+
+<a href="#" id="nav-button">
+    <span>
+        MENU
+        <img src="../docs/images/navbar.png" alt="navbar-image"/>
+    </span>
+</a>
+<div class="tocify-wrapper">
+    
+            <div class="lang-selector">
+                                            <button type="button" class="lang-button" data-language-name="bash">bash</button>
+                                            <button type="button" class="lang-button" data-language-name="javascript">javascript</button>
+                    </div>
+    
+    <div class="search">
+        <input type="text" class="search" id="input-search" placeholder="Buscar">
+    </div>
+
+    <div id="toc">
+                    <ul id="tocify-header-introducao" class="tocify-header">
+                <li class="tocify-item level-1" data-unique="introducao">
+                    <a href="#introducao">Introdução</a>
+                </li>
+                            </ul>
+                    <ul id="tocify-header-autenticacao" class="tocify-header">
+                <li class="tocify-item level-1" data-unique="autenticacao">
+                    <a href="#autenticacao">Autenticação</a>
+                </li>
+                            </ul>
+                    <ul id="tocify-header-disponibilidade" class="tocify-header">
+                <li class="tocify-item level-1" data-unique="disponibilidade">
+                    <a href="#disponibilidade">Disponibilidade</a>
+                </li>
+                                    <ul id="tocify-subheader-disponibilidade" class="tocify-subheader">
+                                                    <li class="tocify-item level-2" data-unique="disponibilidade-GETapi-profissionais--profissional_id--disponibilidade">
+                                <a href="#disponibilidade-GETapi-profissionais--profissional_id--disponibilidade">Listar horários livres</a>
+                            </li>
+                                                                        </ul>
+                            </ul>
+                    <ul id="tocify-header-reservas" class="tocify-header">
+                <li class="tocify-item level-1" data-unique="reservas">
+                    <a href="#reservas">Reservas</a>
+                </li>
+                                    <ul id="tocify-subheader-reservas" class="tocify-subheader">
+                                                    <li class="tocify-item level-2" data-unique="reservas-POSTapi-agendamentos">
+                                <a href="#reservas-POSTapi-agendamentos">Reservar um horário</a>
+                            </li>
+                                                                        </ul>
+                            </ul>
+                    <ul id="tocify-header-webhooks" class="tocify-header">
+                <li class="tocify-item level-1" data-unique="webhooks">
+                    <a href="#webhooks">Webhooks</a>
+                </li>
+                                    <ul id="tocify-subheader-webhooks" class="tocify-subheader">
+                                                    <li class="tocify-item level-2" data-unique="webhooks-POSTapi-webhooks-mercadopago">
+                                <a href="#webhooks-POSTapi-webhooks-mercadopago">Aviso de pagamento do Mercado Pago</a>
+                            </li>
+                                                                        </ul>
+                            </ul>
+            </div>
+
+    <ul class="toc-footer" id="toc-footer">
+                    <li style="padding-bottom: 5px;"><a href="../docs/collection.json">Ver coleção do Postman</a></li>
+                            <li style="padding-bottom: 5px;"><a href="../docs/openapi.yaml">Ver especificação OpenAPI</a></li>
+                <li><a href="http://github.com/knuckleswtf/scribe">Documentation powered by Scribe ✍</a></li>
+    </ul>
+
+    <ul class="toc-footer" id="last-updated">
+        <li>Atualizado em 21/11/2026</li>
+    </ul>
+</div>
+
+<div class="page-wrapper">
+    <div class="dark-box"></div>
+    <div class="content">
+        <h1 id="introducao">Introdução</h1>
+<p>Consulta de horários livres, reserva com sinal via Pix e webhook de pagamento.</p>
+<aside>
+    <strong>URL base</strong>: <code>http://localhost:8080</code>
+</aside>
+<p>API pública do sistema de agendamentos. O fluxo do cliente é:</p>
+<ol>
+<li><strong>Consultar horários livres</strong> de um profissional para um serviço numa data.</li>
+<li><strong>Reservar</strong> um desses horários: a API cria um agendamento <code>pendente</code> e devolve o <strong>Pix do sinal</strong>.</li>
+<li><strong>Pagar o sinal</strong> em até 15 minutos. O Mercado Pago avisa o <strong>webhook</strong>, o agendamento passa a <code>confirmado</code> e o cliente recebe um e-mail com o link de cancelamento.</li>
+</ol>
+<p>Sem pagamento no prazo, a reserva vence e o horário volta a ficar livre.</p>
+<aside>Datas e horas usam ISO 8601 com o deslocamento do fuso (<code>2026-11-30T10:00:00-03:00</code>). Valores monetários são inteiros em centavos (<code>3000</code> = R$ 30,00).</aside>
+
+        <h1 id="autenticacao">Autenticação</h1>
+<p>Esta API não exige autenticação: a reserva é pública e o webhook é validado pela assinatura.</p>
+
+        <h1 id="disponibilidade">Disponibilidade</h1>
+
+    
+
+                                <h2 id="disponibilidade-GETapi-profissionais--profissional_id--disponibilidade">Listar horários livres</h2>
+
+<p>
+</p>
+
+<p>Horários em que o profissional pode atender o serviço na data, já
+descontando jornada, bloqueios (folgas, almoço), agendamentos e a
+antecedência mínima (2 h) e máxima (60 dias). A grade é de 30 em 30
+minutos.</p>
+<p>A lista é informativa: entre a consulta e a reserva, outra pessoa pode
+reservar o mesmo horário. Por isso a reserva confere de novo e pode
+responder 409.</p>
+
+<span id="example-requests-GETapi-profissionais--profissional_id--disponibilidade">
+<blockquote>Exemplo de requisição:</blockquote>
+
+
+<div class="bash-example">
+    <pre><code class="language-bash">curl --request GET \
+    --get "http://localhost:8080/api/profissionais/1/disponibilidade?servico_id=1&amp;data=2026-11-30" \
+    --header "Content-Type: application/json" \
+    --header "Accept: application/json"</code></pre></div>
+
+
+<div class="javascript-example">
+    <pre><code class="language-javascript">const url = new URL(
+    "http://localhost:8080/api/profissionais/1/disponibilidade"
+);
+
+const params = {
+    "servico_id": "1",
+    "data": "2026-11-30",
+};
+Object.keys(params)
+    .forEach(key =&gt; url.searchParams.append(key, params[key]));
+
+const headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+};
+
+
+fetch(url, {
+    method: "GET",
+    headers,
+}).then(response =&gt; response.json());</code></pre></div>
+
+</span>
+
+<span id="example-responses-GETapi-profissionais--profissional_id--disponibilidade">
+            <blockquote>
+            <p>Exemplo de resposta (200, Horários livres):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;data&quot;: [
+        {
+            &quot;inicio&quot;: &quot;2026-11-30T09:00:00-03:00&quot;,
+            &quot;fim&quot;: &quot;2026-11-30T10:00:00-03:00&quot;
+        },
+        {
+            &quot;inicio&quot;: &quot;2026-11-30T09:30:00-03:00&quot;,
+            &quot;fim&quot;: &quot;2026-11-30T10:30:00-03:00&quot;
+        },
+        {
+            &quot;inicio&quot;: &quot;2026-11-30T11:00:00-03:00&quot;,
+            &quot;fim&quot;: &quot;2026-11-30T12:00:00-03:00&quot;
+        }
+    ]
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (200, Dia sem jornada, profissional inativo ou que não realiza o serviço):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;data&quot;: []
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (404, Profissional não encontrado):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;message&quot;: &quot;Registro n&atilde;o encontrado.&quot;
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (422, Parâmetros inválidos):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;message&quot;: &quot;O campo data deve estar no formato Y-m-d.&quot;,
+    &quot;errors&quot;: {
+        &quot;data&quot;: [
+            &quot;O campo data deve estar no formato Y-m-d.&quot;
+        ]
+    }
+}</code>
+ </pre>
+    </span>
+<span id="execution-results-GETapi-profissionais--profissional_id--disponibilidade" hidden>
+    <blockquote>Resposta recebida<span
+                id="execution-response-status-GETapi-profissionais--profissional_id--disponibilidade"></span>:
+    </blockquote>
+    <pre class="json"><code id="execution-response-content-GETapi-profissionais--profissional_id--disponibilidade"
+      data-empty-response-text="<Resposta vazia>" style="max-height: 400px;"></code></pre>
+</span>
+<span id="execution-error-GETapi-profissionais--profissional_id--disponibilidade" hidden>
+    <blockquote>A requisição falhou com o erro:</blockquote>
+    <pre><code id="execution-error-message-GETapi-profissionais--profissional_id--disponibilidade">
+
+Dica: confira sua conexão de rede.
+Se você mantém esta API, verifique se ela está no ar e se o CORS está habilitado.
+O console do navegador mostra mais detalhes.</code></pre>
+</span>
+<form id="form-GETapi-profissionais--profissional_id--disponibilidade" data-method="GET"
+      data-path="api/profissionais/{profissional_id}/disponibilidade"
+      data-authed="0"
+      data-hasfiles="0"
+      data-isarraybody="0"
+      autocomplete="off"
+      onsubmit="event.preventDefault(); executeTryOut('GETapi-profissionais--profissional_id--disponibilidade', this);">
+    <h3>
+        Requisição&nbsp;&nbsp;&nbsp;
+                    <button type="button"
+                    style="background-color: #8fbcd4; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-tryout-GETapi-profissionais--profissional_id--disponibilidade"
+                    onclick="tryItOut('GETapi-profissionais--profissional_id--disponibilidade');">Testar ⚡
+            </button>
+            <button type="button"
+                    style="background-color: #c97a7e; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-canceltryout-GETapi-profissionais--profissional_id--disponibilidade"
+                    onclick="cancelTryOut('GETapi-profissionais--profissional_id--disponibilidade');" hidden>Cancelar 🛑
+            </button>&nbsp;&nbsp;
+            <button type="submit"
+                    style="background-color: #6ac174; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-executetryout-GETapi-profissionais--profissional_id--disponibilidade"
+                    data-initial-text="Enviar requisição 💥"
+                    data-loading-text="⏱ Enviando..."
+                    hidden>Enviar requisição 💥
+            </button>
+            </h3>
+            <p>
+            <small class="badge badge-green">GET</small>
+            <b><code>api/profissionais/{profissional_id}/disponibilidade</code></b>
+        </p>
+                <h4 class="fancy-heading-panel"><b>Headers</b></h4>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Content-Type</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Content-Type"                data-endpoint="GETapi-profissionais--profissional_id--disponibilidade"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Accept</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Accept"                data-endpoint="GETapi-profissionais--profissional_id--disponibilidade"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                        <h4 class="fancy-heading-panel"><b>Parâmetros de URL</b></h4>
+                    <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>profissional_id</code></b>&nbsp;&nbsp;
+<small>integer</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="number" style="display: none"
+               step="any"               name="profissional_id"                data-endpoint="GETapi-profissionais--profissional_id--disponibilidade"
+               value="1"
+               data-component="url">
+    <br>
+<p>The ID of the profissional. Example: <code>1</code></p>
+            </div>
+                    <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>profissional</code></b>&nbsp;&nbsp;
+<small>integer</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="number" style="display: none"
+               step="any"               name="profissional"                data-endpoint="GETapi-profissionais--profissional_id--disponibilidade"
+               value="1"
+               data-component="url">
+    <br>
+<p>Id do profissional. Example: <code>1</code></p>
+            </div>
+                        <h4 class="fancy-heading-panel"><b>Parâmetros de query</b></h4>
+                                    <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>servico_id</code></b>&nbsp;&nbsp;
+<small>integer</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="number" style="display: none"
+               step="any"               name="servico_id"                data-endpoint="GETapi-profissionais--profissional_id--disponibilidade"
+               value="1"
+               data-component="query">
+    <br>
+<p>Id do serviço (ativo). A duração dele define o fim de cada horário. Example: <code>1</code></p>
+            </div>
+                                    <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>data</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="data"                data-endpoint="GETapi-profissionais--profissional_id--disponibilidade"
+               value="2026-11-30"
+               data-component="query">
+    <br>
+<p>Dia consultado, no formato AAAA-MM-DD. Must be a valid date in the format <code>Y-m-d</code>. Example: <code>2026-11-30</code></p>
+            </div>
+                </form>
+
+                <h1 id="reservas">Reservas</h1>
+
+    
+
+                                <h2 id="reservas-POSTapi-agendamentos">Reservar um horário</h2>
+
+<p>
+</p>
+
+<p>Cria um agendamento <code>pendente</code>, que segura o horário por 15 minutos, e
+devolve o Pix do sinal (copia e cola e QR Code em base64). Pago o sinal,
+o webhook confirma o agendamento e o cliente recebe um e-mail.</p>
+<p>O cliente é identificado pelo e-mail, sem precisar de conta: na próxima
+reserva, nome e telefone são atualizados. O preço e o sinal ficam
+gravados no agendamento, e mudanças posteriores no serviço não os alteram.</p>
+<p>Limite: 5 reservas por minuto por IP.</p>
+
+<span id="example-requests-POSTapi-agendamentos">
+<blockquote>Exemplo de requisição:</blockquote>
+
+
+<div class="bash-example">
+    <pre><code class="language-bash">curl --request POST \
+    "http://localhost:8080/api/agendamentos" \
+    --header "Content-Type: application/json" \
+    --header "Accept: application/json" \
+    --data "{
+    \"profissional_id\": 1,
+    \"servico_id\": 1,
+    \"inicio\": \"2026-11-30T10:00:00-03:00\",
+    \"cliente\": {
+        \"nome\": \"Maria Silva\",
+        \"email\": \"maria@example.com\",
+        \"telefone\": \"(11) 91234-5678\"
+    }
+}"
+</code></pre></div>
+
+
+<div class="javascript-example">
+    <pre><code class="language-javascript">const url = new URL(
+    "http://localhost:8080/api/agendamentos"
+);
+
+const headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+};
+
+let body = {
+    "profissional_id": 1,
+    "servico_id": 1,
+    "inicio": "2026-11-30T10:00:00-03:00",
+    "cliente": {
+        "nome": "Maria Silva",
+        "email": "maria@example.com",
+        "telefone": "(11) 91234-5678"
+    }
+};
+
+fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+}).then(response =&gt; response.json());</code></pre></div>
+
+</span>
+
+<span id="example-responses-POSTapi-agendamentos">
+            <blockquote>
+            <p>Exemplo de resposta (201, Reserva criada):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;data&quot;: {
+        &quot;id&quot;: 42,
+        &quot;status&quot;: {
+            &quot;valor&quot;: &quot;pendente&quot;,
+            &quot;rotulo&quot;: &quot;Pendente&quot;
+        },
+        &quot;inicio&quot;: &quot;2026-11-30T10:00:00-03:00&quot;,
+        &quot;fim&quot;: &quot;2026-11-30T11:00:00-03:00&quot;,
+        &quot;expira_em&quot;: &quot;2026-11-27T08:15:00-03:00&quot;,
+        &quot;valor_centavos&quot;: 12000,
+        &quot;sinal_centavos&quot;: 3000,
+        &quot;profissional&quot;: {
+            &quot;id&quot;: 1,
+            &quot;nome&quot;: &quot;Ana Souza&quot;
+        },
+        &quot;servico&quot;: {
+            &quot;id&quot;: 1,
+            &quot;nome&quot;: &quot;Corte feminino&quot;,
+            &quot;duracao_minutos&quot;: 60
+        },
+        &quot;cliente&quot;: {
+            &quot;nome&quot;: &quot;Maria Silva&quot;,
+            &quot;email&quot;: &quot;maria@example.com&quot;
+        },
+        &quot;pagamento&quot;: {
+            &quot;status&quot;: {
+                &quot;valor&quot;: &quot;pendente&quot;,
+                &quot;rotulo&quot;: &quot;Aguardando pagamento&quot;
+            },
+            &quot;valor_centavos&quot;: 3000,
+            &quot;expira_em&quot;: &quot;2026-11-27T08:15:00-03:00&quot;,
+            &quot;pix&quot;: {
+                &quot;copia_e_cola&quot;: &quot;00020126580014br.gov.bcb.pix0136...6304ABCD&quot;,
+                &quot;qr_code_base64&quot;: &quot;iVBORw0KGgoAAAANSUhEUgAA...&quot;
+            }
+        }
+    }
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (409, Horário ocupado, fora da grade ou da jornada, ou fora da antecedência):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;message&quot;: &quot;O hor&aacute;rio escolhido n&atilde;o est&aacute; dispon&iacute;vel. Consulte os hor&aacute;rios livres e tente outro.&quot;
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (422, Dados inválidos):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;message&quot;: &quot;O campo nome &eacute; obrigat&oacute;rio. (e mais 1 erro)&quot;,
+    &quot;errors&quot;: {
+        &quot;cliente.nome&quot;: [
+            &quot;O campo nome &eacute; obrigat&oacute;rio.&quot;
+        ],
+        &quot;servico_id&quot;: [
+            &quot;Este profissional n&atilde;o realiza o servi&ccedil;o escolhido.&quot;
+        ]
+    }
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (429, Limite de reservas por IP):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;message&quot;: &quot;Muitas requisi&ccedil;&otilde;es. Tente novamente em instantes.&quot;
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (503, Pix não pôde ser gerado (a reserva é desfeita)):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;message&quot;: &quot;N&atilde;o foi poss&iacute;vel gerar o Pix agora. Tente reservar novamente em instantes.&quot;
+}</code>
+ </pre>
+    </span>
+<span id="execution-results-POSTapi-agendamentos" hidden>
+    <blockquote>Resposta recebida<span
+                id="execution-response-status-POSTapi-agendamentos"></span>:
+    </blockquote>
+    <pre class="json"><code id="execution-response-content-POSTapi-agendamentos"
+      data-empty-response-text="<Resposta vazia>" style="max-height: 400px;"></code></pre>
+</span>
+<span id="execution-error-POSTapi-agendamentos" hidden>
+    <blockquote>A requisição falhou com o erro:</blockquote>
+    <pre><code id="execution-error-message-POSTapi-agendamentos">
+
+Dica: confira sua conexão de rede.
+Se você mantém esta API, verifique se ela está no ar e se o CORS está habilitado.
+O console do navegador mostra mais detalhes.</code></pre>
+</span>
+<form id="form-POSTapi-agendamentos" data-method="POST"
+      data-path="api/agendamentos"
+      data-authed="0"
+      data-hasfiles="0"
+      data-isarraybody="0"
+      autocomplete="off"
+      onsubmit="event.preventDefault(); executeTryOut('POSTapi-agendamentos', this);">
+    <h3>
+        Requisição&nbsp;&nbsp;&nbsp;
+                    <button type="button"
+                    style="background-color: #8fbcd4; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-tryout-POSTapi-agendamentos"
+                    onclick="tryItOut('POSTapi-agendamentos');">Testar ⚡
+            </button>
+            <button type="button"
+                    style="background-color: #c97a7e; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-canceltryout-POSTapi-agendamentos"
+                    onclick="cancelTryOut('POSTapi-agendamentos');" hidden>Cancelar 🛑
+            </button>&nbsp;&nbsp;
+            <button type="submit"
+                    style="background-color: #6ac174; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-executetryout-POSTapi-agendamentos"
+                    data-initial-text="Enviar requisição 💥"
+                    data-loading-text="⏱ Enviando..."
+                    hidden>Enviar requisição 💥
+            </button>
+            </h3>
+            <p>
+            <small class="badge badge-black">POST</small>
+            <b><code>api/agendamentos</code></b>
+        </p>
+                <h4 class="fancy-heading-panel"><b>Headers</b></h4>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Content-Type</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Content-Type"                data-endpoint="POSTapi-agendamentos"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Accept</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Accept"                data-endpoint="POSTapi-agendamentos"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                                <h4 class="fancy-heading-panel"><b>Parâmetros do corpo</b></h4>
+        <div style=" padding-left: 28px;  clear: unset;">
+            <b style="line-height: 2;"><code>profissional_id</code></b>&nbsp;&nbsp;
+<small>integer</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="number" style="display: none"
+               step="any"               name="profissional_id"                data-endpoint="POSTapi-agendamentos"
+               value="1"
+               data-component="body">
+    <br>
+<p>Id do profissional (ativo). Example: <code>1</code></p>
+        </div>
+                <div style=" padding-left: 28px;  clear: unset;">
+            <b style="line-height: 2;"><code>servico_id</code></b>&nbsp;&nbsp;
+<small>integer</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="number" style="display: none"
+               step="any"               name="servico_id"                data-endpoint="POSTapi-agendamentos"
+               value="1"
+               data-component="body">
+    <br>
+<p>Id do serviço (ativo) que o profissional realiza. Example: <code>1</code></p>
+        </div>
+                <div style=" padding-left: 28px;  clear: unset;">
+            <b style="line-height: 2;"><code>inicio</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="inicio"                data-endpoint="POSTapi-agendamentos"
+               value="2026-11-30T10:00:00-03:00"
+               data-component="body">
+    <br>
+<p>Início do horário em ISO 8601, como devolvido pela disponibilidade. Outros fusos são convertidos para o horário de Brasília. O campo value deve ser uma data válida. Example: <code>2026-11-30T10:00:00-03:00</code></p>
+        </div>
+                <div style=" padding-left: 28px;  clear: unset;">
+        <details>
+            <summary style="padding-bottom: 10px;">
+                <b style="line-height: 2;"><code>cliente</code></b>&nbsp;&nbsp;
+<small>object</small>&nbsp;
+ &nbsp;
+ &nbsp;
+<br>
+<p>Dados de contato de quem vai ser atendido.</p>
+            </summary>
+                                                <div style="margin-left: 14px; clear: unset;">
+                        <b style="line-height: 2;"><code>nome</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="cliente.nome"                data-endpoint="POSTapi-agendamentos"
+               value="Maria Silva"
+               data-component="body">
+    <br>
+<p>Nome do cliente. O campo value não pode ter mais de 255 caracteres. Example: <code>Maria Silva</code></p>
+                    </div>
+                                                                <div style="margin-left: 14px; clear: unset;">
+                        <b style="line-height: 2;"><code>email</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="cliente.email"                data-endpoint="POSTapi-agendamentos"
+               value="maria@example.com"
+               data-component="body">
+    <br>
+<p>E-mail: identifica o cliente e recebe a confirmação, o lembrete e o link de cancelamento. O campo value deve ser um endereço de e-mail válido. O campo value não pode ter mais de 255 caracteres. Example: <code>maria@example.com</code></p>
+                    </div>
+                                                                <div style="margin-left: 14px; clear: unset;">
+                        <b style="line-height: 2;"><code>telefone</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="cliente.telefone"                data-endpoint="POSTapi-agendamentos"
+               value="(11) 91234-5678"
+               data-component="body">
+    <br>
+<p>Telefone com DDD. Must match the regex /^[0-9()+-\s]{10,20}$/. Example: <code>(11) 91234-5678</code></p>
+                    </div>
+                                    </details>
+        </div>
+        </form>
+
+                <h1 id="webhooks">Webhooks</h1>
+
+    
+
+                                <h2 id="webhooks-POSTapi-webhooks-mercadopago">Aviso de pagamento do Mercado Pago</h2>
+
+<p>
+</p>
+
+<p>Chamado pelo Mercado Pago, não pelo cliente. Só enfileira e responde
+200: o Mercado Pago espera resposta em poucos segundos e reenvia se não
+receber. O trabalho pesado (consultar a API, atualizar a agenda) fica no
+job.</p>
+<p>O corpo é tratado só como sinal: o job consulta o pagamento na API do
+Mercado Pago, que é a fonte da verdade. Avisos repetidos ou fora de ordem
+não mudam nada (processamento idempotente).</p>
+<p>A assinatura é HMAC-SHA256 de <code>id:{data.id};request-id:{x-request-id};ts:{ts};</code>
+com o segredo do webhook; avisos com <code>ts</code> a mais de 5 minutos do horário
+do servidor são recusados.</p>
+
+<span id="example-requests-POSTapi-webhooks-mercadopago">
+<blockquote>Exemplo de requisição:</blockquote>
+
+
+<div class="bash-example">
+    <pre><code class="language-bash">curl --request POST \
+    "http://localhost:8080/api/webhooks/mercadopago?type=payment" \
+    --header "x-signature: required Assinatura no formato ts={timestamp},v1={hmac}. Example: ts=1764252000,v1=5f1c...e9" \
+    --header "x-request-id: Id do aviso enviado pelo Mercado Pago. Example: bb56a2f1-6aae-46ac-982e-9dcd3581d08e" \
+    --header "Content-Type: application/json" \
+    --header "Accept: application/json" \
+    --data "{
+    \"type\": \"payment\",
+    \"data\": {
+        \"id\": \"1325461234\"
+    }
+}"
+</code></pre></div>
+
+
+<div class="javascript-example">
+    <pre><code class="language-javascript">const url = new URL(
+    "http://localhost:8080/api/webhooks/mercadopago"
+);
+
+const params = {
+    "type": "payment",
+};
+Object.keys(params)
+    .forEach(key =&gt; url.searchParams.append(key, params[key]));
+
+const headers = {
+    "x-signature": "required Assinatura no formato ts={timestamp},v1={hmac}. Example: ts=1764252000,v1=5f1c...e9",
+    "x-request-id": "Id do aviso enviado pelo Mercado Pago. Example: bb56a2f1-6aae-46ac-982e-9dcd3581d08e",
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+};
+
+let body = {
+    "type": "payment",
+    "data": {
+        "id": "1325461234"
+    }
+};
+
+fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+}).then(response =&gt; response.json());</code></pre></div>
+
+</span>
+
+<span id="example-responses-POSTapi-webhooks-mercadopago">
+            <blockquote>
+            <p>Exemplo de resposta (200, Aviso aceito e enfileirado):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;recebido&quot;: true,
+    &quot;processado&quot;: true
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (200, Tópico ignorado (ex.: merchant_order)):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;recebido&quot;: true,
+    &quot;processado&quot;: false
+}</code>
+ </pre>
+            <blockquote>
+            <p>Exemplo de resposta (401, Assinatura ausente, inválida ou antiga):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;message&quot;: &quot;Assinatura inv&aacute;lida.&quot;
+}</code>
+ </pre>
+    </span>
+<span id="execution-results-POSTapi-webhooks-mercadopago" hidden>
+    <blockquote>Resposta recebida<span
+                id="execution-response-status-POSTapi-webhooks-mercadopago"></span>:
+    </blockquote>
+    <pre class="json"><code id="execution-response-content-POSTapi-webhooks-mercadopago"
+      data-empty-response-text="<Resposta vazia>" style="max-height: 400px;"></code></pre>
+</span>
+<span id="execution-error-POSTapi-webhooks-mercadopago" hidden>
+    <blockquote>A requisição falhou com o erro:</blockquote>
+    <pre><code id="execution-error-message-POSTapi-webhooks-mercadopago">
+
+Dica: confira sua conexão de rede.
+Se você mantém esta API, verifique se ela está no ar e se o CORS está habilitado.
+O console do navegador mostra mais detalhes.</code></pre>
+</span>
+<form id="form-POSTapi-webhooks-mercadopago" data-method="POST"
+      data-path="api/webhooks/mercadopago"
+      data-authed="0"
+      data-hasfiles="0"
+      data-isarraybody="0"
+      autocomplete="off"
+      onsubmit="event.preventDefault(); executeTryOut('POSTapi-webhooks-mercadopago', this);">
+    <h3>
+        Requisição&nbsp;&nbsp;&nbsp;
+                    <button type="button"
+                    style="background-color: #8fbcd4; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-tryout-POSTapi-webhooks-mercadopago"
+                    onclick="tryItOut('POSTapi-webhooks-mercadopago');">Testar ⚡
+            </button>
+            <button type="button"
+                    style="background-color: #c97a7e; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-canceltryout-POSTapi-webhooks-mercadopago"
+                    onclick="cancelTryOut('POSTapi-webhooks-mercadopago');" hidden>Cancelar 🛑
+            </button>&nbsp;&nbsp;
+            <button type="submit"
+                    style="background-color: #6ac174; padding: 5px 10px; border-radius: 5px; border-width: thin;"
+                    id="btn-executetryout-POSTapi-webhooks-mercadopago"
+                    data-initial-text="Enviar requisição 💥"
+                    data-loading-text="⏱ Enviando..."
+                    hidden>Enviar requisição 💥
+            </button>
+            </h3>
+            <p>
+            <small class="badge badge-black">POST</small>
+            <b><code>api/webhooks/mercadopago</code></b>
+        </p>
+                <h4 class="fancy-heading-panel"><b>Headers</b></h4>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>x-signature</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="x-signature"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="required Assinatura no formato ts={timestamp},v1={hmac}. Example: ts=1764252000,v1=5f1c...e9"
+               data-component="header">
+    <br>
+<p>Example: <code>required Assinatura no formato ts={timestamp},v1={hmac}. Example: ts=1764252000,v1=5f1c...e9</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>x-request-id</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="x-request-id"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="Id do aviso enviado pelo Mercado Pago. Example: bb56a2f1-6aae-46ac-982e-9dcd3581d08e"
+               data-component="header">
+    <br>
+<p>Example: <code>Id do aviso enviado pelo Mercado Pago. Example: bb56a2f1-6aae-46ac-982e-9dcd3581d08e</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Content-Type</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Content-Type"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Accept</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Accept"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                            <h4 class="fancy-heading-panel"><b>Parâmetros de query</b></h4>
+                                    <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>data.id</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="data.id"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="1325461234"
+               data-component="query">
+    <br>
+<p>Id do pagamento no Mercado Pago. Example: <code>1325461234</code></p>
+            </div>
+                                    <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>type</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+ &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="type"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="payment"
+               data-component="query">
+    <br>
+<p>Tópico do aviso; só <code>payment</code> é processado. Example: <code>payment</code></p>
+            </div>
+                        <h4 class="fancy-heading-panel"><b>Parâmetros do corpo</b></h4>
+        <div style=" padding-left: 28px;  clear: unset;">
+            <b style="line-height: 2;"><code>type</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+<i>optional</i> &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="type"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="payment"
+               data-component="body">
+    <br>
+<p>Tópico do aviso. Example: <code>payment</code></p>
+        </div>
+                <div style=" padding-left: 28px;  clear: unset;">
+        <details>
+            <summary style="padding-bottom: 10px;">
+                <b style="line-height: 2;"><code>data</code></b>&nbsp;&nbsp;
+<small>object</small>&nbsp;
+<i>optional</i> &nbsp;
+ &nbsp;
+<br>
+<p>Recurso que mudou.</p>
+            </summary>
+                                                <div style="margin-left: 14px; clear: unset;">
+                        <b style="line-height: 2;"><code>id</code></b>&nbsp;&nbsp;
+<small>string</small>&nbsp;
+<i>optional</i> &nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="data.id"                data-endpoint="POSTapi-webhooks-mercadopago"
+               value="1325461234"
+               data-component="body">
+    <br>
+<p>Id do pagamento. Example: <code>1325461234</code></p>
+                    </div>
+                                    </details>
+        </div>
+        </form>
+
+            
+
+        
+    </div>
+    <div class="dark-box">
+                    <div class="lang-selector">
+                                                        <button type="button" class="lang-button" data-language-name="bash">bash</button>
+                                                        <button type="button" class="lang-button" data-language-name="javascript">javascript</button>
+                            </div>
+            </div>
+</div>
+</body>
+</html>

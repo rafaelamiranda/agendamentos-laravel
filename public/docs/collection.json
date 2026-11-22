@@ -1,0 +1,253 @@
+{
+    "variable": [
+        {
+            "id": "baseUrl",
+            "key": "baseUrl",
+            "type": "string",
+            "name": "string",
+            "value": "http:\/\/localhost:8080"
+        }
+    ],
+    "info": {
+        "name": "API de Agendamentos",
+        "_postman_id": "3a5234eb-187d-4f83-8ac5-5c522be2adad",
+        "description": "Consulta de hor\u00e1rios livres, reserva com sinal via Pix e webhook de pagamento.",
+        "schema": "https:\/\/schema.getpostman.com\/json\/collection\/v2.1.0\/collection.json"
+    },
+    "item": [
+        {
+            "name": "Disponibilidade",
+            "description": "",
+            "item": [
+                {
+                    "name": "Listar hor\u00e1rios livres",
+                    "request": {
+                        "url": {
+                            "host": "{{baseUrl}}",
+                            "path": "api\/profissionais\/:profissional_id\/disponibilidade",
+                            "query": [
+                                {
+                                    "key": "servico_id",
+                                    "value": "1",
+                                    "description": "Id do servi\u00e7o (ativo). A dura\u00e7\u00e3o dele define o fim de cada hor\u00e1rio.",
+                                    "disabled": false
+                                },
+                                {
+                                    "key": "data",
+                                    "value": "2026-11-30",
+                                    "description": "Dia consultado, no formato AAAA-MM-DD. Must be a valid date in the format Y-m-d.",
+                                    "disabled": false
+                                }
+                            ],
+                            "raw": "{{baseUrl}}\/api\/profissionais\/:profissional_id\/disponibilidade?servico_id=1&data=2026-11-30",
+                            "variable": [
+                                {
+                                    "id": "profissional_id",
+                                    "key": "profissional_id",
+                                    "value": 1,
+                                    "description": "The ID of the profissional."
+                                },
+                                {
+                                    "id": "profissional",
+                                    "key": "profissional",
+                                    "value": 1,
+                                    "description": "Id do profissional."
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application\/json"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application\/json"
+                            }
+                        ],
+                        "body": null,
+                        "description": "Hor\u00e1rios em que o profissional pode atender o servi\u00e7o na data, j\u00e1\ndescontando jornada, bloqueios (folgas, almo\u00e7o), agendamentos e a\nanteced\u00eancia m\u00ednima (2 h) e m\u00e1xima (60 dias). A grade \u00e9 de 30 em 30\nminutos.\n\nA lista \u00e9 informativa: entre a consulta e a reserva, outra pessoa pode\nreservar o mesmo hor\u00e1rio. Por isso a reserva confere de novo e pode\nresponder 409.",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    },
+                    "response": [
+                        {
+                            "header": [],
+                            "code": 200,
+                            "body": "{\"data\": [{\"inicio\": \"2026-11-30T09:00:00-03:00\", \"fim\": \"2026-11-30T10:00:00-03:00\"}, {\"inicio\": \"2026-11-30T09:30:00-03:00\", \"fim\": \"2026-11-30T10:30:00-03:00\"}, {\"inicio\": \"2026-11-30T11:00:00-03:00\", \"fim\": \"2026-11-30T12:00:00-03:00\"}]}",
+                            "name": "Hor\u00e1rios livres"
+                        },
+                        {
+                            "header": [],
+                            "code": 200,
+                            "body": "{\"data\": []}",
+                            "name": "Dia sem jornada, profissional inativo ou que n\u00e3o realiza o servi\u00e7o"
+                        },
+                        {
+                            "header": [],
+                            "code": 404,
+                            "body": "{\"message\": \"Registro n\u00e3o encontrado.\"}",
+                            "name": "Profissional n\u00e3o encontrado"
+                        },
+                        {
+                            "header": [],
+                            "code": 422,
+                            "body": "{\"message\": \"O campo data deve estar no formato Y-m-d.\", \"errors\": {\"data\": [\"O campo data deve estar no formato Y-m-d.\"]}}",
+                            "name": "Par\u00e2metros inv\u00e1lidos"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Reservas",
+            "description": "",
+            "item": [
+                {
+                    "name": "Reservar um hor\u00e1rio",
+                    "request": {
+                        "url": {
+                            "host": "{{baseUrl}}",
+                            "path": "api\/agendamentos",
+                            "query": [],
+                            "raw": "{{baseUrl}}\/api\/agendamentos"
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application\/json"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application\/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"profissional_id\":1,\"servico_id\":1,\"inicio\":\"2026-11-30T10:00:00-03:00\",\"cliente\":{\"nome\":\"Maria Silva\",\"email\":\"maria@example.com\",\"telefone\":\"(11) 91234-5678\"}}"
+                        },
+                        "description": "Cria um agendamento `pendente`, que segura o hor\u00e1rio por 15 minutos, e\ndevolve o Pix do sinal (copia e cola e QR Code em base64). Pago o sinal,\no webhook confirma o agendamento e o cliente recebe um e-mail.\n\nO cliente \u00e9 identificado pelo e-mail, sem precisar de conta: na pr\u00f3xima\nreserva, nome e telefone s\u00e3o atualizados. O pre\u00e7o e o sinal ficam\ngravados no agendamento, e mudan\u00e7as posteriores no servi\u00e7o n\u00e3o os alteram.\n\nLimite: 5 reservas por minuto por IP.",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    },
+                    "response": [
+                        {
+                            "header": [],
+                            "code": 201,
+                            "body": "{\"data\": {\"id\": 42, \"status\": {\"valor\": \"pendente\", \"rotulo\": \"Pendente\"}, \"inicio\": \"2026-11-30T10:00:00-03:00\", \"fim\": \"2026-11-30T11:00:00-03:00\", \"expira_em\": \"2026-11-27T08:15:00-03:00\", \"valor_centavos\": 12000, \"sinal_centavos\": 3000, \"profissional\": {\"id\": 1, \"nome\": \"Ana Souza\"}, \"servico\": {\"id\": 1, \"nome\": \"Corte feminino\", \"duracao_minutos\": 60}, \"cliente\": {\"nome\": \"Maria Silva\", \"email\": \"maria@example.com\"}, \"pagamento\": {\"status\": {\"valor\": \"pendente\", \"rotulo\": \"Aguardando pagamento\"}, \"valor_centavos\": 3000, \"expira_em\": \"2026-11-27T08:15:00-03:00\", \"pix\": {\"copia_e_cola\": \"00020126580014br.gov.bcb.pix0136...6304ABCD\", \"qr_code_base64\": \"iVBORw0KGgoAAAANSUhEUgAA...\"}}}}",
+                            "name": "Reserva criada"
+                        },
+                        {
+                            "header": [],
+                            "code": 409,
+                            "body": "{\"message\": \"O hor\u00e1rio escolhido n\u00e3o est\u00e1 dispon\u00edvel. Consulte os hor\u00e1rios livres e tente outro.\"}",
+                            "name": "Hor\u00e1rio ocupado, fora da grade ou da jornada, ou fora da anteced\u00eancia"
+                        },
+                        {
+                            "header": [],
+                            "code": 422,
+                            "body": "{\"message\": \"O campo nome \u00e9 obrigat\u00f3rio. (e mais 1 erro)\", \"errors\": {\"cliente.nome\": [\"O campo nome \u00e9 obrigat\u00f3rio.\"], \"servico_id\": [\"Este profissional n\u00e3o realiza o servi\u00e7o escolhido.\"]}}",
+                            "name": "Dados inv\u00e1lidos"
+                        },
+                        {
+                            "header": [],
+                            "code": 429,
+                            "body": "{\"message\": \"Muitas requisi\u00e7\u00f5es. Tente novamente em instantes.\"}",
+                            "name": "Limite de reservas por IP"
+                        },
+                        {
+                            "header": [],
+                            "code": 503,
+                            "body": "{\"message\": \"N\u00e3o foi poss\u00edvel gerar o Pix agora. Tente reservar novamente em instantes.\"}",
+                            "name": "Pix n\u00e3o p\u00f4de ser gerado (a reserva \u00e9 desfeita)"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Webhooks",
+            "description": "",
+            "item": [
+                {
+                    "name": "Aviso de pagamento do Mercado Pago",
+                    "request": {
+                        "url": {
+                            "host": "{{baseUrl}}",
+                            "path": "api\/webhooks\/mercadopago",
+                            "query": [
+                                {
+                                    "key": "data.id",
+                                    "value": "1325461234",
+                                    "description": "Id do pagamento no Mercado Pago.",
+                                    "disabled": false
+                                },
+                                {
+                                    "key": "type",
+                                    "value": "payment",
+                                    "description": "T\u00f3pico do aviso; s\u00f3 `payment` \u00e9 processado.",
+                                    "disabled": false
+                                }
+                            ],
+                            "raw": "{{baseUrl}}\/api\/webhooks\/mercadopago?data.id=1325461234&type=payment"
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "x-signature",
+                                "value": "required Assinatura no formato ts={timestamp},v1={hmac}. Example: ts=1764252000,v1=5f1c...e9"
+                            },
+                            {
+                                "key": "x-request-id",
+                                "value": "Id do aviso enviado pelo Mercado Pago. Example: bb56a2f1-6aae-46ac-982e-9dcd3581d08e"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application\/json"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application\/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"type\":\"payment\",\"data\":{\"id\":\"1325461234\"}}"
+                        },
+                        "description": "Chamado pelo Mercado Pago, n\u00e3o pelo cliente. S\u00f3 enfileira e responde\n200: o Mercado Pago espera resposta em poucos segundos e reenvia se n\u00e3o\nreceber. O trabalho pesado (consultar a API, atualizar a agenda) fica no\njob.\n\nO corpo \u00e9 tratado s\u00f3 como sinal: o job consulta o pagamento na API do\nMercado Pago, que \u00e9 a fonte da verdade. Avisos repetidos ou fora de ordem\nn\u00e3o mudam nada (processamento idempotente).\n\nA assinatura \u00e9 HMAC-SHA256 de `id:{data.id};request-id:{x-request-id};ts:{ts};`\ncom o segredo do webhook; avisos com `ts` a mais de 5 minutos do hor\u00e1rio\ndo servidor s\u00e3o recusados.",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    },
+                    "response": [
+                        {
+                            "header": [],
+                            "code": 200,
+                            "body": "{\"recebido\": true, \"processado\": true}",
+                            "name": "Aviso aceito e enfileirado"
+                        },
+                        {
+                            "header": [],
+                            "code": 200,
+                            "body": "{\"recebido\": true, \"processado\": false}",
+                            "name": "T\u00f3pico ignorado (ex.: merchant_order)"
+                        },
+                        {
+                            "header": [],
+                            "code": 401,
+                            "body": "{\"message\": \"Assinatura inv\u00e1lida.\"}",
+                            "name": "Assinatura ausente, inv\u00e1lida ou antiga"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "auth": {
+        "type": "noauth"
+    }
+}

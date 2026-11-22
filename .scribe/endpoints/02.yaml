@@ -1,0 +1,125 @@
+name: Webhooks
+description: ''
+endpoints:
+  -
+    custom: []
+    httpMethods:
+      - POST
+    uri: api/webhooks/mercadopago
+    metadata:
+      custom: []
+      groupName: Webhooks
+      groupDescription: ''
+      subgroup: ''
+      subgroupDescription: ''
+      title: 'Aviso de pagamento do Mercado Pago'
+      description: |-
+        Chamado pelo Mercado Pago, não pelo cliente. Só enfileira e responde
+        200: o Mercado Pago espera resposta em poucos segundos e reenvia se não
+        receber. O trabalho pesado (consultar a API, atualizar a agenda) fica no
+        job.
+
+        O corpo é tratado só como sinal: o job consulta o pagamento na API do
+        Mercado Pago, que é a fonte da verdade. Avisos repetidos ou fora de ordem
+        não mudam nada (processamento idempotente).
+
+        A assinatura é HMAC-SHA256 de `id:{data.id};request-id:{x-request-id};ts:{ts};`
+        com o segredo do webhook; avisos com `ts` a mais de 5 minutos do horário
+        do servidor são recusados.
+      authenticated: false
+      deprecated: false
+    headers:
+      x-signature: 'required Assinatura no formato ts={timestamp},v1={hmac}. Example: ts=1764252000,v1=5f1c...e9'
+      x-request-id: 'Id do aviso enviado pelo Mercado Pago. Example: bb56a2f1-6aae-46ac-982e-9dcd3581d08e'
+      Content-Type: application/json
+      Accept: application/json
+    urlParameters: []
+    cleanUrlParameters: []
+    queryParameters:
+      data.id:
+        custom: []
+        name: data.id
+        description: 'Id do pagamento no Mercado Pago.'
+        required: true
+        example: '1325461234'
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      type:
+        custom: []
+        name: type
+        description: 'Tópico do aviso; só `payment` é processado.'
+        required: true
+        example: payment
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+    cleanQueryParameters:
+      type: payment
+    bodyParameters:
+      type:
+        custom: []
+        name: type
+        description: 'Tópico do aviso.'
+        required: false
+        example: payment
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      data:
+        custom: []
+        name: data
+        description: 'Recurso que mudou.'
+        required: false
+        example: []
+        type: object
+        enumValues: []
+        exampleWasSpecified: false
+        nullable: false
+        deprecated: false
+      data.id:
+        custom: []
+        name: data.id
+        description: 'Id do pagamento.'
+        required: false
+        example: '1325461234'
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+    cleanBodyParameters:
+      type: payment
+      data:
+        id: '1325461234'
+    fileParameters: []
+    responses:
+      -
+        custom: []
+        status: 200
+        content: '{"recebido": true, "processado": true}'
+        headers: []
+        description: 'Aviso aceito e enfileirado'
+      -
+        custom: []
+        status: 200
+        content: '{"recebido": true, "processado": false}'
+        headers: []
+        description: 'Tópico ignorado (ex.: merchant_order)'
+      -
+        custom: []
+        status: 401
+        content: '{"message": "Assinatura inválida."}'
+        headers: []
+        description: 'Assinatura ausente, inválida ou antiga'
+    responseFields: []
+    auth: []
+    controller: null
+    method: null
+    route: null

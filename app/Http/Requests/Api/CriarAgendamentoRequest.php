@@ -70,6 +70,24 @@ class CriarAgendamentoRequest extends FormRequest
         ];
     }
 
+    /**
+     * Descrições para a documentação da API (Scribe).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function bodyParameters(): array
+    {
+        return [
+            'profissional_id' => ['description' => 'Id do profissional (ativo).', 'example' => 1],
+            'servico_id' => ['description' => 'Id do serviço (ativo) que o profissional realiza.', 'example' => 1],
+            'inicio' => ['description' => 'Início do horário em ISO 8601, como devolvido pela disponibilidade. Outros fusos são convertidos para o horário de Brasília.', 'example' => '2026-11-30T10:00:00-03:00'],
+            'cliente' => ['description' => 'Dados de contato de quem vai ser atendido.'],
+            'cliente.nome' => ['description' => 'Nome do cliente.', 'example' => 'Maria Silva'],
+            'cliente.email' => ['description' => 'E-mail: identifica o cliente e recebe a confirmação, o lembrete e o link de cancelamento.', 'example' => 'maria@example.com'],
+            'cliente.telefone' => ['description' => 'Telefone com DDD.', 'example' => '(11) 91234-5678'],
+        ];
+    }
+
     /** @return array<string, string> */
     public function messages(): array
     {

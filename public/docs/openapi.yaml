@@ -1,0 +1,508 @@
+openapi: 3.0.3
+info:
+  title: 'API de Agendamentos'
+  description: 'Consulta de horários livres, reserva com sinal via Pix e webhook de pagamento.'
+  version: 1.0.0
+servers:
+  -
+    url: 'http://localhost:8080'
+tags:
+  -
+    name: Disponibilidade
+    description: ''
+  -
+    name: Reservas
+    description: ''
+  -
+    name: Webhooks
+    description: ''
+paths:
+  '/api/profissionais/{profissional_id}/disponibilidade':
+    get:
+      summary: 'Listar horários livres'
+      operationId: listarHorriosLivres
+      description: "Horários em que o profissional pode atender o serviço na data, já\ndescontando jornada, bloqueios (folgas, almoço), agendamentos e a\nantecedência mínima (2 h) e máxima (60 dias). A grade é de 30 em 30\nminutos.\n\nA lista é informativa: entre a consulta e a reserva, outra pessoa pode\nreservar o mesmo horário. Por isso a reserva confere de novo e pode\nresponder 409."
+      parameters:
+        -
+          in: query
+          name: servico_id
+          description: 'Id do serviço (ativo). A duração dele define o fim de cada horário.'
+          example: 1
+          required: true
+          schema:
+            type: integer
+            description: 'Id do serviço (ativo). A duração dele define o fim de cada horário.'
+            example: 1
+        -
+          in: query
+          name: data
+          description: 'Dia consultado, no formato AAAA-MM-DD. Must be a valid date in the format <code>Y-m-d</code>.'
+          example: '2026-11-30'
+          required: true
+          schema:
+            type: string
+            description: 'Dia consultado, no formato AAAA-MM-DD. Must be a valid date in the format <code>Y-m-d</code>.'
+            example: '2026-11-30'
+      responses:
+        200:
+          description: ''
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  -
+                    description: 'Horários livres'
+                    type: object
+                    example:
+                      data:
+                        -
+                          inicio: '2026-11-30T09:00:00-03:00'
+                          fim: '2026-11-30T10:00:00-03:00'
+                        -
+                          inicio: '2026-11-30T09:30:00-03:00'
+                          fim: '2026-11-30T10:30:00-03:00'
+                        -
+                          inicio: '2026-11-30T11:00:00-03:00'
+                          fim: '2026-11-30T12:00:00-03:00'
+                    properties:
+                      data:
+                        type: array
+                        example:
+                          -
+                            inicio: '2026-11-30T09:00:00-03:00'
+                            fim: '2026-11-30T10:00:00-03:00'
+                          -
+                            inicio: '2026-11-30T09:30:00-03:00'
+                            fim: '2026-11-30T10:30:00-03:00'
+                          -
+                            inicio: '2026-11-30T11:00:00-03:00'
+                            fim: '2026-11-30T12:00:00-03:00'
+                        items:
+                          type: object
+                          properties:
+                            inicio:
+                              type: string
+                              example: '2026-11-30T09:00:00-03:00'
+                            fim:
+                              type: string
+                              example: '2026-11-30T10:00:00-03:00'
+                  -
+                    description: 'Dia sem jornada, profissional inativo ou que não realiza o serviço'
+                    type: object
+                    example:
+                      data: []
+                    properties:
+                      data:
+                        type: array
+                        example: []
+        404:
+          description: 'Profissional não encontrado'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: 'Registro não encontrado.'
+                properties:
+                  message:
+                    type: string
+                    example: 'Registro não encontrado.'
+        422:
+          description: 'Parâmetros inválidos'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: 'O campo data deve estar no formato Y-m-d.'
+                  errors:
+                    data:
+                      - 'O campo data deve estar no formato Y-m-d.'
+                properties:
+                  message:
+                    type: string
+                    example: 'O campo data deve estar no formato Y-m-d.'
+                  errors:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        example:
+                          - 'O campo data deve estar no formato Y-m-d.'
+                        items:
+                          type: string
+      tags:
+        - Disponibilidade
+      security: []
+    parameters:
+      -
+        in: path
+        name: profissional_id
+        description: 'The ID of the profissional.'
+        example: 1
+        required: true
+        schema:
+          type: integer
+      -
+        in: path
+        name: profissional
+        description: 'Id do profissional.'
+        example: 1
+        required: true
+        schema:
+          type: integer
+  /api/agendamentos:
+    post:
+      summary: 'Reservar um horário'
+      operationId: reservarUmHorrio
+      description: "Cria um agendamento `pendente`, que segura o horário por 15 minutos, e\ndevolve o Pix do sinal (copia e cola e QR Code em base64). Pago o sinal,\no webhook confirma o agendamento e o cliente recebe um e-mail.\n\nO cliente é identificado pelo e-mail, sem precisar de conta: na próxima\nreserva, nome e telefone são atualizados. O preço e o sinal ficam\ngravados no agendamento, e mudanças posteriores no serviço não os alteram.\n\nLimite: 5 reservas por minuto por IP."
+      parameters: []
+      responses:
+        201:
+          description: 'Reserva criada'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  data:
+                    id: 42
+                    status:
+                      valor: pendente
+                      rotulo: Pendente
+                    inicio: '2026-11-30T10:00:00-03:00'
+                    fim: '2026-11-30T11:00:00-03:00'
+                    expira_em: '2026-11-27T08:15:00-03:00'
+                    valor_centavos: 12000
+                    sinal_centavos: 3000
+                    profissional:
+                      id: 1
+                      nome: 'Ana Souza'
+                    servico:
+                      id: 1
+                      nome: 'Corte feminino'
+                      duracao_minutos: 60
+                    cliente:
+                      nome: 'Maria Silva'
+                      email: maria@example.com
+                    pagamento:
+                      status:
+                        valor: pendente
+                        rotulo: 'Aguardando pagamento'
+                      valor_centavos: 3000
+                      expira_em: '2026-11-27T08:15:00-03:00'
+                      pix:
+                        copia_e_cola: 00020126580014br.gov.bcb.pix0136...6304ABCD
+                        qr_code_base64: iVBORw0KGgoAAAANSUhEUgAA...
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 42
+                      status:
+                        type: object
+                        properties:
+                          valor:
+                            type: string
+                            example: pendente
+                          rotulo:
+                            type: string
+                            example: Pendente
+                      inicio:
+                        type: string
+                        example: '2026-11-30T10:00:00-03:00'
+                      fim:
+                        type: string
+                        example: '2026-11-30T11:00:00-03:00'
+                      expira_em:
+                        type: string
+                        example: '2026-11-27T08:15:00-03:00'
+                      valor_centavos:
+                        type: integer
+                        example: 12000
+                      sinal_centavos:
+                        type: integer
+                        example: 3000
+                      profissional:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 1
+                          nome:
+                            type: string
+                            example: 'Ana Souza'
+                      servico:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            example: 1
+                          nome:
+                            type: string
+                            example: 'Corte feminino'
+                          duracao_minutos:
+                            type: integer
+                            example: 60
+                      cliente:
+                        type: object
+                        properties:
+                          nome:
+                            type: string
+                            example: 'Maria Silva'
+                          email:
+                            type: string
+                            example: maria@example.com
+                      pagamento:
+                        type: object
+                        properties:
+                          status:
+                            type: object
+                            properties:
+                              valor:
+                                type: string
+                                example: pendente
+                              rotulo:
+                                type: string
+                                example: 'Aguardando pagamento'
+                          valor_centavos:
+                            type: integer
+                            example: 3000
+                          expira_em:
+                            type: string
+                            example: '2026-11-27T08:15:00-03:00'
+                          pix:
+                            type: object
+                            properties:
+                              copia_e_cola:
+                                type: string
+                                example: 00020126580014br.gov.bcb.pix0136...6304ABCD
+                              qr_code_base64:
+                                type: string
+                                example: iVBORw0KGgoAAAANSUhEUgAA...
+        409:
+          description: 'Horário ocupado, fora da grade ou da jornada, ou fora da antecedência'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: 'O horário escolhido não está disponível. Consulte os horários livres e tente outro.'
+                properties:
+                  message:
+                    type: string
+                    example: 'O horário escolhido não está disponível. Consulte os horários livres e tente outro.'
+        422:
+          description: 'Dados inválidos'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: 'O campo nome é obrigatório. (e mais 1 erro)'
+                  errors:
+                    cliente.nome:
+                      - 'O campo nome é obrigatório.'
+                    servico_id:
+                      - 'Este profissional não realiza o serviço escolhido.'
+                properties:
+                  message:
+                    type: string
+                    example: 'O campo nome é obrigatório. (e mais 1 erro)'
+                  errors:
+                    type: object
+                    properties:
+                      cliente.nome:
+                        type: array
+                        example:
+                          - 'O campo nome é obrigatório.'
+                        items:
+                          type: string
+                      servico_id:
+                        type: array
+                        example:
+                          - 'Este profissional não realiza o serviço escolhido.'
+                        items:
+                          type: string
+        429:
+          description: 'Limite de reservas por IP'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: 'Muitas requisições. Tente novamente em instantes.'
+                properties:
+                  message:
+                    type: string
+                    example: 'Muitas requisições. Tente novamente em instantes.'
+        503:
+          description: 'Pix não pôde ser gerado (a reserva é desfeita)'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: 'Não foi possível gerar o Pix agora. Tente reservar novamente em instantes.'
+                properties:
+                  message:
+                    type: string
+                    example: 'Não foi possível gerar o Pix agora. Tente reservar novamente em instantes.'
+      tags:
+        - Reservas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                profissional_id:
+                  type: integer
+                  description: 'Id do profissional (ativo).'
+                  example: 1
+                servico_id:
+                  type: integer
+                  description: 'Id do serviço (ativo) que o profissional realiza.'
+                  example: 1
+                inicio:
+                  type: string
+                  description: 'Início do horário em ISO 8601, como devolvido pela disponibilidade. Outros fusos são convertidos para o horário de Brasília. O campo value deve ser uma data válida.'
+                  example: '2026-11-30T10:00:00-03:00'
+                cliente:
+                  type: object
+                  description: 'Dados de contato de quem vai ser atendido.'
+                  example: []
+                  properties:
+                    nome:
+                      type: string
+                      description: 'Nome do cliente. O campo value não pode ter mais de 255 caracteres.'
+                      example: 'Maria Silva'
+                    email:
+                      type: string
+                      description: 'E-mail: identifica o cliente e recebe a confirmação, o lembrete e o link de cancelamento. O campo value deve ser um endereço de e-mail válido. O campo value não pode ter mais de 255 caracteres.'
+                      example: maria@example.com
+                    telefone:
+                      type: string
+                      description: 'Telefone com DDD. Must match the regex /^[0-9()+\-\s]{10,20}$/.'
+                      example: '(11) 91234-5678'
+                  required:
+                    - nome
+                    - email
+                    - telefone
+              required:
+                - profissional_id
+                - servico_id
+                - inicio
+                - cliente
+      security: []
+  /api/webhooks/mercadopago:
+    post:
+      summary: 'Aviso de pagamento do Mercado Pago'
+      operationId: avisoDePagamentoDoMercadoPago
+      description: "Chamado pelo Mercado Pago, não pelo cliente. Só enfileira e responde\n200: o Mercado Pago espera resposta em poucos segundos e reenvia se não\nreceber. O trabalho pesado (consultar a API, atualizar a agenda) fica no\njob.\n\nO corpo é tratado só como sinal: o job consulta o pagamento na API do\nMercado Pago, que é a fonte da verdade. Avisos repetidos ou fora de ordem\nnão mudam nada (processamento idempotente).\n\nA assinatura é HMAC-SHA256 de `id:{data.id};request-id:{x-request-id};ts:{ts};`\ncom o segredo do webhook; avisos com `ts` a mais de 5 minutos do horário\ndo servidor são recusados."
+      parameters:
+        -
+          in: query
+          name: data.id
+          description: 'Id do pagamento no Mercado Pago.'
+          example: '1325461234'
+          required: true
+          schema:
+            type: string
+            description: 'Id do pagamento no Mercado Pago.'
+            example: '1325461234'
+        -
+          in: query
+          name: type
+          description: 'Tópico do aviso; só `payment` é processado.'
+          example: payment
+          required: true
+          schema:
+            type: string
+            description: 'Tópico do aviso; só `payment` é processado.'
+            example: payment
+        -
+          in: header
+          name: x-signature
+          description: ''
+          example: 'required Assinatura no formato ts={timestamp},v1={hmac}. Example: ts=1764252000,v1=5f1c...e9'
+          schema:
+            type: string
+        -
+          in: header
+          name: x-request-id
+          description: ''
+          example: 'Id do aviso enviado pelo Mercado Pago. Example: bb56a2f1-6aae-46ac-982e-9dcd3581d08e'
+          schema:
+            type: string
+      responses:
+        200:
+          description: ''
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  -
+                    description: 'Aviso aceito e enfileirado'
+                    type: object
+                    example:
+                      recebido: true
+                      processado: true
+                    properties:
+                      recebido:
+                        type: boolean
+                        example: true
+                      processado:
+                        type: boolean
+                        example: true
+                  -
+                    description: 'Tópico ignorado (ex.: merchant_order)'
+                    type: object
+                    example:
+                      recebido: true
+                      processado: false
+                    properties:
+                      recebido:
+                        type: boolean
+                        example: true
+                      processado:
+                        type: boolean
+                        example: false
+        401:
+          description: 'Assinatura ausente, inválida ou antiga'
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  message: 'Assinatura inválida.'
+                properties:
+                  message:
+                    type: string
+                    example: 'Assinatura inválida.'
+      tags:
+        - Webhooks
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  description: 'Tópico do aviso.'
+                  example: payment
+                data:
+                  type: object
+                  description: 'Recurso que mudou.'
+                  example: []
+                  properties:
+                    id:
+                      type: string
+                      description: 'Id do pagamento.'
+                      example: '1325461234'
+      security: []

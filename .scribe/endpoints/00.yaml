@@ -1,0 +1,114 @@
+name: Disponibilidade
+description: ''
+endpoints:
+  -
+    custom: []
+    httpMethods:
+      - GET
+    uri: 'api/profissionais/{profissional_id}/disponibilidade'
+    metadata:
+      custom: []
+      groupName: Disponibilidade
+      groupDescription: ''
+      subgroup: ''
+      subgroupDescription: ''
+      title: 'Listar horários livres'
+      description: |-
+        Horários em que o profissional pode atender o serviço na data, já
+        descontando jornada, bloqueios (folgas, almoço), agendamentos e a
+        antecedência mínima (2 h) e máxima (60 dias). A grade é de 30 em 30
+        minutos.
+
+        A lista é informativa: entre a consulta e a reserva, outra pessoa pode
+        reservar o mesmo horário. Por isso a reserva confere de novo e pode
+        responder 409.
+      authenticated: false
+      deprecated: false
+    headers:
+      Content-Type: application/json
+      Accept: application/json
+    urlParameters:
+      profissional_id:
+        custom: []
+        name: profissional_id
+        description: 'The ID of the profissional.'
+        required: true
+        example: 1
+        type: integer
+        enumValues: []
+        exampleWasSpecified: false
+        nullable: false
+        deprecated: false
+      profissional:
+        custom: []
+        name: profissional
+        description: 'Id do profissional.'
+        required: true
+        example: 1
+        type: integer
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+    cleanUrlParameters:
+      profissional_id: 1
+      profissional: 1
+    queryParameters:
+      servico_id:
+        custom: []
+        name: servico_id
+        description: 'Id do serviço (ativo). A duração dele define o fim de cada horário.'
+        required: true
+        example: 1
+        type: integer
+        enumValues: []
+        exampleWasSpecified: false
+        nullable: false
+        deprecated: false
+      data:
+        custom: []
+        name: data
+        description: 'Dia consultado, no formato AAAA-MM-DD. Must be a valid date in the format <code>Y-m-d</code>.'
+        required: true
+        example: '2026-11-30'
+        type: string
+        enumValues: []
+        exampleWasSpecified: false
+        nullable: false
+        deprecated: false
+    cleanQueryParameters:
+      servico_id: 1
+      data: '2026-11-30'
+    bodyParameters: []
+    cleanBodyParameters: []
+    fileParameters: []
+    responses:
+      -
+        custom: []
+        status: 200
+        content: '{"data": [{"inicio": "2026-11-30T09:00:00-03:00", "fim": "2026-11-30T10:00:00-03:00"}, {"inicio": "2026-11-30T09:30:00-03:00", "fim": "2026-11-30T10:30:00-03:00"}, {"inicio": "2026-11-30T11:00:00-03:00", "fim": "2026-11-30T12:00:00-03:00"}]}'
+        headers: []
+        description: 'Horários livres'
+      -
+        custom: []
+        status: 200
+        content: '{"data": []}'
+        headers: []
+        description: 'Dia sem jornada, profissional inativo ou que não realiza o serviço'
+      -
+        custom: []
+        status: 404
+        content: '{"message": "Registro não encontrado."}'
+        headers: []
+        description: 'Profissional não encontrado'
+      -
+        custom: []
+        status: 422
+        content: '{"message": "O campo data deve estar no formato Y-m-d.", "errors": {"data": ["O campo data deve estar no formato Y-m-d."]}}'
+        headers: []
+        description: 'Parâmetros inválidos'
+    responseFields: []
+    auth: []
+    controller: null
+    method: null
+    route: null

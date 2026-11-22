@@ -43,3 +43,6 @@ yarn-error.log
 /boost.json
 /opencode.json
 /opencode.jsonc
+
+# Cache intermediário do Scribe (o resto de .scribe/ é versionado)
+/.scribe/endpoints.cache

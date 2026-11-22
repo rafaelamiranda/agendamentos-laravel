@@ -22,6 +22,19 @@ class ConsultarDisponibilidadeRequest extends FormRequest
         ];
     }
 
+    /**
+     * Descrições para a documentação da API (Scribe).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function queryParameters(): array
+    {
+        return [
+            'servico_id' => ['description' => 'Id do serviço (ativo). A duração dele define o fim de cada horário.', 'example' => 1],
+            'data' => ['description' => 'Dia consultado, no formato AAAA-MM-DD.', 'example' => '2026-11-30'],
+        ];
+    }
+
     public function servico(): Servico
     {
         return Servico::findOrFail($this->integer('servico_id'));

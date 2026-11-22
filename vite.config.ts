@@ -65,6 +65,9 @@ export default defineConfig({
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
             '.github/**',
+            // Gerado pelo Scribe (php artisan scribe:generate).
+            'public/docs/**',
+            '.scribe/**',
             'composer.json',
             'resources/js/components/ui/*',
             'resources/views/mail/*',
