@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Pagamento;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +42,12 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            // Contador da sidebar: um COUNT simples por página, só para
+            // administradores. A closure fica de fora das visitas parciais
+            // (router.reload com only) que não pedem esta prop.
+            'pendencias' => fn () => $request->user()?->administrador
+                ? ['estornos' => Pagamento::query()->where('requer_estorno', true)->count()]
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

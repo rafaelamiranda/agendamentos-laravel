@@ -4,6 +4,7 @@ use App\Http\Controllers\CancelamentoClienteController;
 use App\Http\Controllers\Painel\AgendaController;
 use App\Http\Controllers\Painel\BloqueioController;
 use App\Http\Controllers\Painel\CancelamentoController;
+use App\Http\Controllers\Painel\EstornoController;
 use App\Http\Controllers\Painel\JornadaController;
 use App\Http\Controllers\Painel\ProfissionalController;
 use App\Http\Controllers\Painel\ServicoController;
@@ -29,6 +30,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('agenda', AgendaController::class)->name('agenda');
     Route::post('agenda/agendamentos/{agendamento}/cancelamento', CancelamentoController::class)
         ->name('agenda.cancelamento');
+
+    Route::get('estornos', [EstornoController::class, 'index'])->name('estornos.index');
+    Route::post('estornos/{pagamento}/tentar-de-novo', [EstornoController::class, 'tentarDeNovo'])
+        ->name('estornos.tentar-de-novo');
+    Route::post('estornos/{pagamento}/marcar-como-devolvido', [EstornoController::class, 'marcarComoDevolvido'])
+        ->name('estornos.marcar-como-devolvido');
 
     Route::resource('profissionais', ProfissionalController::class)
         ->parameters(['profissionais' => 'profissional'])

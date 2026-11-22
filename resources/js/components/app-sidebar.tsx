@@ -1,5 +1,11 @@
-import { Link } from '@inertiajs/react';
-import { CalendarDays, FolderGit2, Scissors, Users } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import {
+    CalendarDays,
+    FolderGit2,
+    ReceiptText,
+    Scissors,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,15 +20,12 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { agenda } from '@/routes';
+import { index as estornos } from '@/routes/estornos';
 import { index as profissionais } from '@/routes/profissionais';
 import { index as servicos } from '@/routes/servicos';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    { title: 'Agenda', href: agenda(), icon: CalendarDays },
-    { title: 'Profissionais', href: profissionais(), icon: Users },
-    { title: 'Serviços', href: servicos(), icon: Scissors },
-];
+type Pendencias = { estornos: number } | null;
 
 const footerNavItems: NavItem[] = [
     {
@@ -33,6 +36,20 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { pendencias } = usePage<{ pendencias: Pendencias }>().props;
+
+    const mainNavItems: NavItem[] = [
+        { title: 'Agenda', href: agenda(), icon: CalendarDays },
+        { title: 'Profissionais', href: profissionais(), icon: Users },
+        { title: 'Serviços', href: servicos(), icon: Scissors },
+        {
+            title: 'Estornos',
+            href: estornos(),
+            icon: ReceiptText,
+            badge: pendencias?.estornos,
+        },
+    ];
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
