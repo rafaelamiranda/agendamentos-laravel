@@ -204,7 +204,10 @@ test('limita as reservas por IP', function () {
         $this->postJson(route('api.agendamentos.store'), [])->assertUnprocessable();
     }
 
-    $this->postJson(route('api.agendamentos.store'), [])->assertTooManyRequests();
+    $this->postJson(route('api.agendamentos.store'), [])
+        ->assertTooManyRequests()
+        ->assertJsonPath('message', 'Muitas requisições. Tente novamente em instantes.')
+        ->assertHeader('Retry-After');
 });
 
 test('a reserva devolve o Pix do sinal para pagamento', function () {

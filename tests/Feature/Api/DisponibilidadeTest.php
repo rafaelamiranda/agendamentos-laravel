@@ -72,5 +72,5 @@ test('responde 404 para profissional inexistente', function () {
         'profissional' => 999,
         'servico_id' => $this->servico->id,
         'data' => '2026-11-30',
-    ]))->assertNotFound();
+    ]))->assertNotFound()->assertExactJson(['message' => 'Registro não encontrado.']);
 });
