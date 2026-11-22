@@ -68,7 +68,10 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
 
             setManualSetupKey(key);
         } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch a setup key']);
+            setErrors((prev) => [
+                ...prev,
+                'Não foi possível obter a chave de configuração',
+            ]);
             setManualSetupKey(null);
         }
     }, [submit]);
@@ -79,7 +82,10 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
             const codes = (await submit(recoveryCodes())) as string[];
             setRecoveryCodesList(codes);
         } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch recovery codes']);
+            setErrors((prev) => [
+                ...prev,
+                'Não foi possível obter os códigos de recuperação',
+            ]);
             setRecoveryCodesList([]);
         }
     }, [submit]);
